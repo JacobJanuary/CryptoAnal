@@ -2,6 +2,8 @@
 
 // Function to display AI Analytics modal
 function showAIAnalytics(name, symbol) {
+    console.log(`Отправка запроса с name=${name}, symbol=${symbol}`);
+
     const modal = document.getElementById('modal');
     const modalLoading = document.getElementById('modal-loading');
     const modalContent = document.getElementById('modal-content-data');
@@ -21,7 +23,10 @@ function showAIAnalytics(name, symbol) {
     })
     .then(response => {
         if (!response.ok) {
-            return response.json().then(err => { throw new Error(err.error || 'Ошибка запроса'); });
+            return response.text().then(err => {
+                console.error('Ошибка на сервере:', err);
+                throw new Error(`Ошибка сервера: ${response.status}`);
+            });
         }
         return response.json();
     })
@@ -33,16 +38,17 @@ function showAIAnalytics(name, symbol) {
             modalLoading.style.display = 'none';
             modalContent.style.display = 'block';
             modalContent.innerHTML = data.content
-                .replace(/### (.*?)\n/g, '<h3>$1</h3>')
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                .replace(/### (.*?)\\n/g, '<h3>$1</h3>')
+                .replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>');
         }
     })
     .catch(error => {
         console.error('Ошибка fetch:', error);
-        alert(`Произошла ошибка при выполнении запроса: ${error.message}`);
+        alert(`Произошла ошибка: ${error.message}`);
         modal.style.display = 'none';
     });
 }
+
 
 // Function to close the modal
 function closeModal() {
