@@ -12,7 +12,6 @@ cache = Cache(app, config={'CACHE_TYPE': 'simple'})
 
 load_dotenv()
 XAI_API_KEY = os.getenv("XAI_API_KEY")  # Безопасное использование ключа
-print(XAI_API_KEY)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE = os.path.join(BASE_DIR, 'cryptocurrencies.db')
@@ -45,6 +44,8 @@ def get_grok_analytics(name, symbol):
             max_tokens=128000,
             messages=[{"role": "user", "content": prompt}]
         )
+
+        print("Ответ API:", response)
 
         if response and isinstance(response.content, str):
             return {"content": response.content}
