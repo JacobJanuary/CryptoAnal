@@ -11,8 +11,9 @@ app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'simple'})
 
 XAI_API_KEY = os.getenv("XAI_API_KEY")  # Безопасное использование ключа
-DATABASE = os.getenv("DATABASE_URI")
-print(XAI_API_KEY)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATABASE = os.path.join(BASE_DIR, 'cryptocurrencies.db')
+
 
 # Вспомогательные функции
 def format_volume(volume):
@@ -55,6 +56,7 @@ def get_grok_analytics(name, symbol):
 @app.route("/", methods=["GET", "POST"])
 @cache.cached(timeout=300)
 def index():
+    conn = None  # Инициализация переменной conn
     try:
         conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
