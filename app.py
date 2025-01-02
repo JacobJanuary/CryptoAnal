@@ -11,6 +11,8 @@ app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'simple'})
 
 XAI_API_KEY = os.getenv("XAI_API_KEY")  # Безопасное использование ключа
+print(XAI_API_KEY)
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE = os.path.join(BASE_DIR, 'cryptocurrencies.db')
 
