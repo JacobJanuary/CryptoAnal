@@ -1,5 +1,7 @@
+from dotenv import load_dotenv
 import os
 
+load_dotenv()
 XAI_API_KEY = os.getenv("XAI_API_KEY")  # Безопасное использование ключа
 # Querying chat models with xAI
 from anthropic import Anthropic

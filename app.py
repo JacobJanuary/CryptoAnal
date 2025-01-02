@@ -2,7 +2,7 @@ import os
 import sqlite3
 import traceback
 from datetime import datetime, timedelta
-
+from dotenv import load_dotenv
 from anthropic import Anthropic
 from flask import Flask, render_template, request, jsonify
 from flask_caching import Cache
@@ -10,6 +10,7 @@ from flask_caching import Cache
 app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'simple'})
 
+load_dotenv()
 XAI_API_KEY = os.getenv("XAI_API_KEY")  # Безопасное использование ключа
 print(XAI_API_KEY)
 
