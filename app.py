@@ -69,7 +69,7 @@ def get_grok_analytics(name, symbol):
 
 # Основной маршрут
 @app.route("/", methods=["GET", "POST"])
-#@cache.cached(timeout=300)
+
 def index():
     conn = None  # Инициализация переменной conn
     try:
@@ -139,7 +139,6 @@ def index():
                         })
 
         if request.method == "POST":
-            print(request.form)  # Логируем входящие данные
             name = request.form.get("name")
             symbol = request.form.get("symbol")
             if name and symbol:

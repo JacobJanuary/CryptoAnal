@@ -1,9 +1,15 @@
 // main.js
 
-// Function to display AI Analytics modal
-function showAIAnalytics(name, symbol) {
-    console.log(`Отправка запроса с name=${name}, symbol=${symbol}`);
+function formatAnalyticsContent(content) {
+    if (!content) return '';
 
+    return content
+        .replace(/###\s*(.*?)\n/g, '<h3>$1</h3>') // Преобразуем ### в заголовки
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Преобразуем **text** в жирный текст
+        .replace(/\n/g, '<br>'); // Преобразуем новые строки в <br>
+}
+
+function showAIAnalytics(name, symbol) {
     const modal = document.getElementById('modal');
     const modalLoading = document.getElementById('modal-loading');
     const modalContent = document.getElementById('modal-content-data');
@@ -37,9 +43,7 @@ function showAIAnalytics(name, symbol) {
         } else {
             modalLoading.style.display = 'none';
             modalContent.style.display = 'block';
-            modalContent.innerHTML = data.content
-                .replace(/### (.*?)\\n/g, '<h3>$1</h3>')
-                .replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>');
+            modalContent.innerHTML = formatAnalyticsContent(data.content); // Используем форматирование
         }
     })
     .catch(error => {
@@ -48,6 +52,7 @@ function showAIAnalytics(name, symbol) {
         modal.style.display = 'none';
     });
 }
+
 
 // Function to close the modal
 function closeModal() {
