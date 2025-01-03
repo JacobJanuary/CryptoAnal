@@ -39,19 +39,30 @@ def get_grok_analytics(name, symbol):
             f"Заходили ли в проект умные деньги, какие твои прогнозы по курсу токена на 2025 год"
         )
 
-        response = client.messages.create(
+        message = client.messages.create(
             model="grok-2-1212",
             max_tokens=128000,
             messages=[{"role": "user", "content": prompt}]
         )
 
-        print("Ответ API:", response)
-
-        if response and isinstance(response.content, str):
-            return {"content": response.content}
+        if message and hasattr(message, 'content') and isinstance(message.content,
+                                                                  list):  # проверяем что message.content именно список
+            text_blocks = message.content
+            full_text = ""
+            for block in text_blocks:
+                if hasattr(block, 'text'):
+                    full_text += block.text
+            return {"content": full_text}
+        elif message and hasattr(message, 'content') and hasattr(message.content,
+                                                                 'text'):  # если это не список, а сразу TextBlock
+            content = message.content.text
+            return {"content": content}
         else:
+            print(f"Unexpected response structure: {message}")
             return {"error": "Unexpected response from API"}
+
     except Exception as e:
+        print(f"Ошибка при запросе к API Grok: {e}")
         traceback.print_exc()
         return {"error": str(e)}
 
