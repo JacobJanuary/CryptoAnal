@@ -69,7 +69,7 @@ def get_grok_analytics(name, symbol):
 
 # Основной маршрут
 @app.route("/", methods=["GET", "POST"])
-@cache.cached(timeout=300)
+#@cache.cached(timeout=300)
 def index():
     conn = None  # Инициализация переменной conn
     try:
