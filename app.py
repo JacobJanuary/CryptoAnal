@@ -73,7 +73,7 @@ def get_grok_invest(name, symbol):
     try:
         client = Anthropic(api_key=XAI_API_KEY, base_url="https://api.x.ai")
         prompt = (
-            f"Найди информацию какие фонды или Smart money инвестировали в проект  {name} ({symbol}). "
+            f"Найди информацию какие фонды или Smart money инвестировали в проект {name} ({symbol}) "
         )
 
         message = client.messages.create(
