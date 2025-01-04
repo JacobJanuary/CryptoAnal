@@ -36,40 +36,26 @@ def get_grok_analytics(name, symbol):
         prompt = (
             f"Дай подробную информацию о проекте {name} ({symbol}). "
             f"Что он делает, когда создан, кто в команде, какие перспективы, развитие, социальная активность. "
-            f"Заходили ли в проект умные деньги, какие твои прогнозы по курсу токена на 2025 год"
+            f"Заходили ли в проект умные деньги, какие твои прогнозы по курсу токена на 2025 год."
         )
 
-        message = client.messages.create(
+        response = client.messages.create(
             model="grok-2-1212",
             max_tokens=128000,
             messages=[{"role": "user", "content": prompt}]
         )
 
-        if message and hasattr(message, 'content') and isinstance(message.content,
-                                                                  list):  # проверяем что message.content именно список
-            text_blocks = message.content
-            full_text = ""
-            for block in text_blocks:
-                if hasattr(block, 'text'):
-                    full_text += block.text
-            return {"content": full_text}
-        elif message and hasattr(message, 'content') and hasattr(message.content,
-                                                                 'text'):  # если это не список, а сразу TextBlock
-            content = message.content.text
-            return {"content": content}
+        if response and isinstance(response.content, str):
+            return {"content": response.content}
         else:
-            print(f"Unexpected response structure: {message}")
             return {"error": "Unexpected response from API"}
-
     except Exception as e:
-        print(f"Ошибка при запросе к API Grok: {e}")
         traceback.print_exc()
         return {"error": str(e)}
 
 
 # Основной маршрут
 @app.route("/", methods=["GET", "POST"])
-
 def index():
     conn = None  # Инициализация переменной conn
     try:
@@ -141,11 +127,30 @@ def index():
         if request.method == "POST":
             name = request.form.get("name")
             symbol = request.form.get("symbol")
-            if name and symbol:
-                analytics = get_grok_analytics(name, symbol)
-                return jsonify(analytics)
-            else:
+
+            if not name or not symbol:
                 return jsonify({"error": "Не переданы name или symbol"}), 400
+
+            # Проверка наличия аналитики в базе данных
+            cursor.execute("SELECT AI_text FROM cryptocurrencies WHERE name = ? AND symbol = ?", (name, symbol))
+            row = cursor.fetchone()
+
+            if row and row[0]:
+                return jsonify({"content": row[0]})
+
+            analytics = get_grok_analytics(name, symbol)
+            if "error" in analytics:
+                return jsonify(analytics), 400
+
+            ai_text = analytics.get("content")
+
+            # Сохранение данных в базу
+            cursor.execute("""
+                UPDATE cryptocurrencies SET AI_text = ? WHERE name = ? AND symbol = ?
+            """, (ai_text, name, symbol))
+            conn.commit()
+
+            return jsonify({"content": ai_text})
 
         return render_template("index.html", crypto_data=crypto_data_to_display, time_difference=time_difference_global)
 
