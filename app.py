@@ -141,11 +141,30 @@ def index():
         if request.method == "POST":
             name = request.form.get("name")
             symbol = request.form.get("symbol")
-            if name and symbol:
-                analytics = get_grok_analytics(name, symbol)
-                return jsonify(analytics)
-            else:
+
+            if not name or not symbol:
                 return jsonify({"error": "Не переданы name или symbol"}), 400
+
+            # Проверка наличия аналитики в базе данных
+            cursor.execute("SELECT AI_text FROM cryptocurrencies WHERE name = ? AND symbol = ?", (name, symbol))
+            row = cursor.fetchone()
+
+            if row and row[0]:
+                return jsonify({"content": row[0]})
+
+            analytics = get_grok_analytics(name, symbol)
+            if "error" in analytics:
+                return jsonify(analytics), 400
+
+            ai_text = analytics.get("content")
+
+            # Сохранение данных в базу
+            cursor.execute("""
+                            UPDATE cryptocurrencies SET AI_text = ? WHERE name = ? AND symbol = ?
+                        """, (ai_text, name, symbol))
+            conn.commit()
+
+            return jsonify({"content": ai_text})
 
         return render_template("index.html", crypto_data=crypto_data_to_display, time_difference=time_difference_global)
 
