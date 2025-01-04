@@ -66,7 +66,6 @@ def get_grok_analytics(name, symbol):
         traceback.print_exc()
         return {"error": str(e)}
 
-
 # Основной маршрут
 @app.route("/", methods=["GET", "POST"])
 
