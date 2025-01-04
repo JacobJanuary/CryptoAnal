@@ -85,7 +85,7 @@ try:
             print(f"Непредвиденная ошибка: {e}")
 
     print("Сбор данных завершен.")
-
+#add delete trash
 except sqlite3.Error as e:
     print(f"Ошибка базы данных: {e}")
 finally:
