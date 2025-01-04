@@ -66,6 +66,43 @@ def get_grok_analytics(name, symbol):
         traceback.print_exc()
         return {"error": str(e)}
 
+def get_grok_invest(name, symbol):
+    if not XAI_API_KEY:
+        return {"error": "API ключ не установлен. Установите переменную окружения XAI_API_KEY."}
+
+    try:
+        client = Anthropic(api_key=XAI_API_KEY, base_url="https://api.x.ai")
+        prompt = (
+            f"Найди информацию какие фонды или Smart money инвестировали в проект  {name} ({symbol}). "
+        )
+
+        message = client.messages.create(
+            model="grok-beta",
+            max_tokens=128000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        if message and hasattr(message, 'content') and isinstance(message.content,
+                                                                  list):  # проверяем что message.content именно список
+            text_blocks = message.content
+            full_text = ""
+            for block in text_blocks:
+                if hasattr(block, 'text'):
+                    full_text += block.text
+            return {"content": full_text}
+        elif message and hasattr(message, 'content') and hasattr(message.content,
+                                                                 'text'):  # если это не список, а сразу TextBlock
+            content = message.content.text
+            return {"content": content}
+        else:
+            print(f"Unexpected response structure: {message}")
+            return {"error": "Unexpected response from API"}
+
+    except Exception as e:
+        print(f"Ошибка при запросе к API Grok: {e}")
+        traceback.print_exc()
+        return {"error": str(e)}
+
 # Основной маршрут
 @app.route("/", methods=["GET", "POST"])
 
@@ -161,6 +198,18 @@ def index():
             cursor.execute("""
                             UPDATE cryptocurrencies SET AI_text = ? WHERE name = ? AND symbol = ?
                         """, (ai_text, name, symbol))
+            conn.commit()
+
+            invest = get_grok_invest(name, symbol)
+            if "error" in invest:
+                return jsonify(invest), 400
+
+            ai_invest = invest.get("content")
+
+            # Сохранение данных в базу
+            cursor.execute("""
+                            UPDATE cryptocurrencies SET AI_invest = ? WHERE name = ? AND symbol = ?
+                                    """, (ai_invest, name, symbol))
             conn.commit()
 
             return jsonify({"content": ai_text})
