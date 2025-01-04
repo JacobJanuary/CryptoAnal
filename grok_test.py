@@ -11,9 +11,12 @@ client = Anthropic(
     base_url="https://api.x.ai",
 )
 
+prompt = (
+            f"Найди информацию какие фонды или Smart money инвестировали в проект StormX (STMX)"
+        )
 message = client.messages.create(
-    model="grok-2-latest",
+    model="grok-beta",
     max_tokens=1024,
-    messages=[{"role": "user", "content": "Hello, Claude"}]
+    messages=[{"role": "user", "content": prompt}]
 )
 print(message.content)
