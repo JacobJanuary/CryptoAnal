@@ -13,10 +13,16 @@ CMC_API_KEY = os.getenv("CMC_API_KEY")
 if not CMC_API_KEY:
     raise ValueError("Необходимо установить переменную окружения COINMARKETCAP_API_KEY")
 
+# Получаем путь к директории, где находится текущий скрипт
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Формируем путь к БД (предположим, что она находится в той же директории)
+db_path = os.path.join(script_dir, 'cryptocurrencies.db')
 conn = None
 
 try:
-    conn = sqlite3.connect('cryptocurrencies.db')
+    #conn = sqlite3.connect('cryptocurrencies.db')
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     cursor.execute('''
