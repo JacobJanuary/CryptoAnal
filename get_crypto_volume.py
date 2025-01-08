@@ -100,7 +100,7 @@ try:
 
     # Удаление криптовалют с объемом торгов менее 100000
     cursor.execute('''
-        SELECT c.id, c.name, c.rank
+        SELECT c.id, c.name, c.cryptorank
         FROM cryptocurrencies c
         INNER JOIN (
             SELECT coin_id, MAX(datetime) as max_datetime
