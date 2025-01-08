@@ -112,7 +112,7 @@ def index():
         conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
 
-        cursor.execute("SELECT id, name, symbol, rank FROM cryptocurrencies")
+        cursor.execute("SELECT id, name, symbol, cryptorank FROM cryptocurrencies")
         cryptos = cursor.fetchall()
 
         crypto_data_to_display = []
@@ -164,7 +164,7 @@ def index():
                         crypto_data_to_display.append({
                             "name": coin_name,
                             "symbol": coin_symbol,
-                            "rank": current_rank,
+                            "rank": current_cryptorank,
                             "current_volume": format_volume(latest_volume),
                             "volume_increase": volume_increase,
                             "current_price": format_price(latest_price),

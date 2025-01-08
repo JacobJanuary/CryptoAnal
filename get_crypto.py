@@ -46,7 +46,7 @@ try:
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS cryptocurrencies (
             id INT NOT NULL PRIMARY KEY, -- PRIMARY KEY для уникального идентификатора
-            rank INT DEFAULT NULL,       -- Ранг, допускается NULL
+            cryptorank INT DEFAULT NULL,       -- Ранг, допускается NULL
             name VARCHAR(255) NOT NULL,  -- Имя криптовалюты, обязательно
             symbol VARCHAR(50) NOT NULL  -- Символ криптовалюты, обязательно
         );
