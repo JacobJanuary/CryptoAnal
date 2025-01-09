@@ -126,9 +126,10 @@ def index():
                     total_volume_increase_percentage / periods_of_growth if periods_of_growth > 0 else 0
                 )
 
-                if time_difference_global is None and len(volume_data) >= 2:
-                    time_difference_global = datetime.fromisoformat(volume_data[0][0]) - datetime.fromisoformat(
-                        volume_data[1][0])
+                if volume_data and len(volume_data) >= 2:
+                    time_difference_global = volume_data[0][0] - volume_data[1][0]  # Если значения уже datetime
+                else:
+                    time_difference_global = timedelta(0)  # Дефолтное значение
 
                 latest_volume, latest_price = volume_data[0][1], volume_data[0][2]
                 previous_volume, previous_price = volume_data[1][1], volume_data[1][2]
