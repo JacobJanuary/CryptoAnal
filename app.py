@@ -109,9 +109,14 @@ def index():
                     prev_volume, prev_datetime = volume_data[i][1], volume_data[i][0]
                     curr_volume, curr_datetime = volume_data[i - 1][1], volume_data[i - 1][0]
 
+                    if prev_datetime and curr_datetime:  # Проверяем, что даты не None
+                        time_diff = datetime.fromisoformat(str(curr_datetime)) - datetime.fromisoformat(
+                            str(prev_datetime))
+                    else:
+                        time_diff = timedelta(0)
+
                     if prev_volume and curr_volume and curr_volume > prev_volume:
                         periods_of_growth += 1
-                        time_diff = datetime.fromisoformat(curr_datetime) - datetime.fromisoformat(prev_datetime)
                         time_of_growth += time_diff
 
                         increase_percentage = ((curr_volume - prev_volume) / prev_volume) * 100
