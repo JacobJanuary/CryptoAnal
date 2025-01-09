@@ -21,17 +21,22 @@ app.config['MYSQL_DB'] = os.getenv("MYSQL_DATABASE", "crypto_db")
 
 mysql = MySQL(app)
 
+
 # Вспомогательные функции
 def format_volume(volume):
     return f"{volume / 1_000_000:.2f} млн" if volume else "N/A"
 
+
 def format_price(price):
     return f"{price:.2f}" if price else "N/A"
+
 
 # Получение аналитики с помощью API Grok
 def get_grok_analytics(name, symbol):
     if not XAI_API_KEY:
-        return {"error": "API ключ не установлен. Установите переменную окружения XAI_API_KEY."}
+        error_msg = "API ключ не установлен. Установите переменную окружения XAI_API_KEY."
+        print(error_msg)
+        return {"error": error_msg}
 
     try:
         client = Anthropic(api_key=XAI_API_KEY, base_url="https://api.x.ai")
@@ -41,28 +46,41 @@ def get_grok_analytics(name, symbol):
             f"Заходили ли в проект умные деньги, какие твои прогнозы по курсу токена на 2025 год."
         )
 
+        print(f"[get_grok_analytics] Prompt:\n{prompt}")
+
         response = client.messages.create(
             model="grok-2-1212",
             max_tokens=128000,
             messages=[{"role": "user", "content": prompt}]
         )
 
+        # Выводим в консоль весь ответ от API
+        print("[get_grok_analytics] Полный ответ от API:", response)
+
         if response and isinstance(response.content, str):
+            print("[get_grok_analytics] Содержимое ответа:", response.content)
             return {"content": response.content}
         else:
-            return {"error": "Unexpected response from API"}
+            error_msg = "Unexpected response from API"
+            print("[get_grok_analytics]", error_msg)
+            return {"error": error_msg}
     except Exception as e:
         traceback.print_exc()
         return {"error": str(e)}
 
+
 # Получение информации об инвестициях
 def get_grok_invest(name, symbol):
     if not XAI_API_KEY:
-        return {"error": "API ключ не установлен. Установите переменную окружения XAI_API_KEY."}
+        error_msg = "API ключ не установлен. Установите переменную окружения XAI_API_KEY."
+        print(error_msg)
+        return {"error": error_msg}
 
     try:
         client = Anthropic(api_key=XAI_API_KEY, base_url="https://api.x.ai")
         prompt = f"Найди информацию какие фонды или Smart money инвестировали в проект {name} ({symbol})."
+
+        print(f"[get_grok_invest] Prompt:\n{prompt}")
 
         response = client.messages.create(
             model="grok-beta",
@@ -70,13 +88,20 @@ def get_grok_invest(name, symbol):
             messages=[{"role": "user", "content": prompt}]
         )
 
+        # Выводим в консоль весь ответ от API
+        print("[get_grok_invest] Полный ответ от API:", response)
+
         if response and isinstance(response.content, str):
+            print("[get_grok_invest] Содержимое ответа:", response.content)
             return {"content": response.content}
         else:
-            return {"error": "Unexpected response from API"}
+            error_msg = "Unexpected response from API"
+            print("[get_grok_invest]", error_msg)
+            return {"error": error_msg}
     except Exception as e:
         traceback.print_exc()
         return {"error": str(e)}
+
 
 # Основной маршрут
 @app.route("/", methods=["GET", "POST"])
@@ -109,7 +134,8 @@ def index():
                     prev_volume, prev_datetime = volume_data[i][1], volume_data[i][0]
                     curr_volume, curr_datetime = volume_data[i - 1][1], volume_data[i - 1][0]
 
-                    if prev_datetime and curr_datetime:  # Проверяем, что даты не None
+                    # Проверяем, что даты не None
+                    if prev_datetime and curr_datetime:
                         time_diff = datetime.fromisoformat(str(curr_datetime)) - datetime.fromisoformat(
                             str(prev_datetime))
                     else:
@@ -127,9 +153,10 @@ def index():
                 )
 
                 if volume_data and len(volume_data) >= 2:
-                    time_difference_global = volume_data[0][0] - volume_data[1][0]  # Если значения уже datetime
+                    # Если значения уже datetime:
+                    time_difference_global = volume_data[0][0] - volume_data[1][0]
                 else:
-                    time_difference_global = timedelta(0)  # Дефолтное значение
+                    time_difference_global = timedelta(0)
 
                 latest_volume, latest_price = volume_data[0][1], volume_data[0][2]
                 previous_volume, previous_price = volume_data[1][1], volume_data[1][2]
@@ -157,35 +184,45 @@ def index():
             symbol = request.form.get("symbol")
 
             if not name or not symbol:
-                return jsonify({"error": "Не переданы name или symbol"}), 400
+                error_msg = "Не переданы name или symbol"
+                print("[index] Ошибка:", error_msg)
+                return jsonify({"error": error_msg}), 400
 
+            # Проверяем, есть ли уже сохранённый AI_text в БД
             cur.execute("SELECT AI_text FROM cryptocurrencies WHERE name = %s AND symbol = %s", (name, symbol))
             row = cur.fetchone()
 
             if row and row[0]:
+                print("[index] AI_text уже есть в БД, возвращаем сохранённый текст.")
                 return jsonify({"content": row[0]})
 
+            # Получаем свежую аналитику
             analytics = get_grok_analytics(name, symbol)
             if "error" in analytics:
+                print("[index] Ошибка при получении аналитики:", analytics["error"])
                 return jsonify(analytics), 400
 
             ai_text = analytics.get("content")
+            print("[index] Полученный AI_text:", ai_text)
 
             cur.execute("""
                 UPDATE cryptocurrencies SET AI_text = %s WHERE name = %s AND symbol = %s
             """, (ai_text, name, symbol))
-            mysql.connection.commit()
+            # mysql.connection.commit()
 
+            # Получаем информацию по инвестициям
             invest = get_grok_invest(name, symbol)
             if "error" in invest:
+                print("[index] Ошибка при получении данных об инвестициях:", invest["error"])
                 return jsonify(invest), 400
 
             ai_invest = invest.get("content")
+            print("[index] Полученный AI_invest:", ai_invest)
 
             cur.execute("""
                 UPDATE cryptocurrencies SET AI_invest = %s WHERE name = %s AND symbol = %s
             """, (ai_invest, name, symbol))
-            mysql.connection.commit()
+            # mysql.connection.commit()
 
             return jsonify({"content": ai_text})
 
@@ -195,5 +232,7 @@ def index():
         traceback.print_exc()
         return jsonify({"error": f"Ошибка: {e}"})
 
+
 if __name__ == "__main__":
+    # Включаем debug для более подробного вывода ошибок в консоль
     app.run(debug=True)
