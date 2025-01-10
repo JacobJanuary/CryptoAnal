@@ -208,20 +208,20 @@ def index():
             cur.execute("""
                 UPDATE cryptocurrencies SET AI_text = %s WHERE name = %s AND symbol = %s
             """, (ai_text, name, symbol))
-            # mysql.connection.commit()
+            mysql.connection.commit()
 
             # Получаем информацию по инвестициям
-            invest = get_grok_invest(name, symbol)
-            if "error" in invest:
-                print("[index] Ошибка при получении данных об инвестициях:", invest["error"])
-                return jsonify(invest), 400
+            #invest = get_grok_invest(name, symbol)
+            #if "error" in invest:
+            #    print("[index] Ошибка при получении данных об инвестициях:", invest["error"])
+            #    return jsonify(invest), 400
 
-            ai_invest = invest.get("content")
-            print("[index] Полученный AI_invest:", ai_invest)
+            #ai_invest = invest.get("content")
+            #print("[index] Полученный AI_invest:", ai_invest)
 
-            cur.execute("""
-                UPDATE cryptocurrencies SET AI_invest = %s WHERE name = %s AND symbol = %s
-            """, (ai_invest, name, symbol))
+            #cur.execute("""
+            #    UPDATE cryptocurrencies SET AI_invest = %s WHERE name = %s AND symbol = %s
+            #""", (ai_invest, name, symbol))
             # mysql.connection.commit()
 
             return jsonify({"content": ai_text})
