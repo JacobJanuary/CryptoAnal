@@ -7,59 +7,61 @@
     <script src="{{ url_for('static', filename='main.js') }}"></script>
 </head>
 <body>
-<h1>Криптовалюты с ростом объема (>= 20%) и без существенного роста (падения) цены за
-    {% if time_difference %}{% if time_difference.days > 0 %}{{ time_difference.days }} дн. {% endif %}
-    {% if time_difference.seconds // 3600 > 0 %}{{ time_difference.seconds // 3600 }} ч. {% endif %}
-    {% if (time_difference.seconds % 3600) // 60 > 0 %}{{ (time_difference.seconds % 3600) // 60 }} мин.{% endif %}
-    {% else %}недостаточно данных{% endif %}</h1>
+<h1>
+    Криптовалюты, у которых объём вырос на 50% или более
+    (за 6 часов или за 1 час),
+    при этом цена изменилась не более чем на ±10% за 6 часов
+</h1>
 {% if crypto_data %}
 <div id="table-container">
     <table id="cryptoTable">
         <thead>
         <tr>
-            <th data-type="string">Name</th>
-            <th data-type="string">Symbol</th>
-            <th data-type="number">Rank</th>
-            <th data-type="number">Текущий объем</th>
-            <th data-type="percent">Прирост объема (%)</th>
-            <th data-type="number">Текущая цена</th>
-            <th data-type="percent">Изменение цены (%)</th>
-            <th>Рост объема</th>
-            <th>Ссылка на CoinMarketCap</th>
-            <th>AI Аналитика</th>
-            <th>AI Фонды</th>
+        <th data-type="string">Name</th>
+        <th data-type="string">Symbol</th>
+        <th data-type="number">Rank</th>
+        <th data-type="number">Volume (latest)</th>
+        <!-- Новый столбец: рост за 6 часов -->
+        <th data-type="percent">Vol+ (6ч)</th>
+        <!-- Новый столбец: рост за 1 час -->
+        <th data-type="percent">Vol+ (1ч)</th>
+        <th data-type="number">Price (latest)</th>
+        <!-- Новый столбец: изменение цены за 6 часов -->
+        <th data-type="percent">Price change (6ч)</th>
+        <th>Ссылка на CMC</th>
+        <th>AI Аналитика</th>
+        <th>AI Фонды</th>
         </tr>
         </thead>
         <tbody>
-        {% for crypto in crypto_data %}
-        <tr>
-            <td>{{ crypto.name }}</td>
-            <td>{{ crypto.symbol }}</td>
-            <td>{{ crypto.rank }}</td>
-            <td>{{ crypto.current_volume }}</td>
-            <td>{{ crypto.volume_increase|round(2) }}%</td>
-            <td>{{ crypto.current_price }}</td>
-            <td class="{% if crypto.price_change > 0 %}positive-change{% elif crypto.price_change < 0 %}negative-change{% endif %}">{{ crypto.price_change|round(2) }}%</td>
-            <td>
-                <div class="tooltip">
-                    {% for i in range(crypto.periods_of_growth) %}★{% endfor %}
-                    <span class="tooltiptext">За {% if crypto.time_of_growth.days > 0 %}{{ crypto.time_of_growth.days }} дн. {% endif %}
-                    {% if crypto.time_of_growth.seconds // 3600 > 0 %}{{ crypto.time_of_growth.seconds // 3600 }} ч. {% endif %}
-                    {% if (crypto.time_of_growth.seconds % 3600) // 60 > 0 %}{{ (crypto.time_of_growth.seconds % 3600) // 60 }} мин.{% endif %}
-                    объем вырос на {{ crypto.average_volume_increase_percentage|round(2) }}%</span>
-                </div>
-            </td>
-            <td><a href="https://coinmarketcap.com/currencies/{{ crypto.name|lower|replace(' ', '-') }}" target="_blank">Ссылка</a></td>
-            <td><button onclick="showAIAnalytics('{{ crypto.name }}', '{{ crypto.symbol }}')" class="ai-analytics">AI Аналитика</button></td>
-            <td><button class="ai-funds">AI Фонды</button></td>
-        </tr>
-        {% endfor %}
-        </tbody>
+    {% for crypto in crypto_data %}
+    <tr>
+        <td>{{ crypto.name }}</td>
+        <td>{{ crypto.symbol }}</td>
+        <td>{{ crypto.rank }}</td>
+        <td>{{ crypto.current_volume }}</td>
+        <td>{{ crypto.volume_increase_6h|round(2) }}%</td>
+        <td>{{ crypto.volume_increase_1h|round(2) }}%</td>
+        <td>{{ crypto.current_price }}</td>
+        <td>{{ crypto.price_change_6h|round(2) }}%</td>
+        <td>
+            <a href="https://coinmarketcap.com/currencies/{{ crypto.name|lower|replace(' ', '-') }}"
+               target="_blank">Ссылка</a>
+        </td>
+        <td>
+            <button onclick="showAIAnalytics('{{ crypto.name }}', '{{ crypto.symbol }}')" class="ai-analytics">
+                AI Аналитика
+            </button>
+        </td>
+        <td><button class="ai-funds">AI Фонды</button></td>
+    </tr>
+    {% endfor %}
+    </tbody>
     </table>
 </div>
 <p>Всего криптовалют с ростом объема: {{ crypto_data|length }}</p>
 {% else %}
-<p>Нет данных о криптовалютах с ростом объема более 10%.</p>
+<p>Нет данных о криптовалютах с ростом объема более 50%.</p>
 {% endif %}
 
 <div id="modal" class="modal">

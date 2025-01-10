@@ -121,63 +121,104 @@ def index():
                 FROM coins_volume_stats
                 WHERE coin_id = %s
                 ORDER BY datetime DESC
-                LIMIT 6
+                LIMIT 7
             ''', (coin_id,))
             volume_data = cur.fetchall()
 
-            if len(volume_data) >= 2:
-                periods_of_growth = 0
-                time_of_growth = timedelta(0)
-                total_volume_increase_percentage = 0
+            # Если вообще нет записей — пропускаем
+            if not volume_data:
+                continue
 
-                for i in range(1, len(volume_data)):
-                    prev_volume, prev_datetime = volume_data[i][1], volume_data[i][0]
-                    curr_volume, curr_datetime = volume_data[i - 1][1], volume_data[i - 1][0]
+            # ---------------------------------------------------
+            # 1) Функция поиска "объёма N часов назад" (fallback 6->5->4->3->2->1)
+            #    Аналогично сделаем и для цены.
+            # ---------------------------------------------------
+            def get_old_value(data, idx=1):
+                """
+                Ищем "старое" значение volume/price n часов назад,
+                при этом пытаемся взять 6, потом 5, 4 и т.д. если не хватает строк.
+                Если нет данных даже на 1 час, вернётся None.
 
-                    # Проверяем, что даты не None
-                    if prev_datetime and curr_datetime:
-                        time_diff = datetime.fromisoformat(str(curr_datetime)) - datetime.fromisoformat(
-                            str(prev_datetime))
-                    else:
-                        time_diff = timedelta(0)
+                Параметр idx=1 говорит: "пытаемся взять 6" (т. е. data[6]),
+                но если len(data) <= 6, пробуем 5, 4... 1.
+                """
+                for hours_back in range(6, 0, -1):
+                    if len(data) > hours_back:
+                        return data[hours_back][idx]  # volume или price
+                return None
 
-                    if prev_volume and curr_volume and curr_volume > prev_volume:
-                        periods_of_growth += 1
-                        time_of_growth += time_diff
+            # ---------------------------------------------------
+            # 2) Расчёт объёмного роста за 6 часов (fallback)
+            # ---------------------------------------------------
+            latest_volume = volume_data[0][1]  # свежий volume
+            old_volume_6h = get_old_value(volume_data, idx=1)  # volume X часов назад
 
-                        increase_percentage = ((curr_volume - prev_volume) / prev_volume) * 100
-                        total_volume_increase_percentage += increase_percentage
+            if old_volume_6h is not None and old_volume_6h != 0:
+                volume_increase_6h = ((latest_volume - old_volume_6h) / old_volume_6h) * 100
+            else:
+                volume_increase_6h = None
 
-                average_volume_increase_percentage = (
-                    total_volume_increase_percentage / periods_of_growth if periods_of_growth > 0 else 0
-                )
-
-                if volume_data and len(volume_data) >= 2:
-                    # Если значения уже datetime:
-                    time_difference_global = volume_data[0][0] - volume_data[1][0]
+            # ---------------------------------------------------
+            # 3) Расчёт объёмного роста за 1 час
+            #    (тут нет fallback: нужен хотя бы 1 предыдущий час — data[1])
+            # ---------------------------------------------------
+            if len(volume_data) > 1:
+                one_hour_volume = volume_data[1][1]
+                if one_hour_volume and one_hour_volume != 0:
+                    volume_increase_1h = ((latest_volume - one_hour_volume) / one_hour_volume) * 100
                 else:
-                    time_difference_global = timedelta(0)
+                    volume_increase_1h = None
+            else:
+                volume_increase_1h = None
 
-                latest_volume, latest_price = volume_data[0][1], volume_data[0][2]
-                previous_volume, previous_price = volume_data[1][1], volume_data[1][2]
+            # ---------------------------------------------------
+            # 4) Расчёт изменения цены за 6 часов (по тому же принципу fallback)
+            # ---------------------------------------------------
+            latest_price = volume_data[0][2]
+            old_price_6h = get_old_value(volume_data, idx=2)
 
-                if all(v is not None for v in (previous_volume, latest_volume, latest_price)):
-                    volume_increase = ((latest_volume - previous_volume) / previous_volume) * 100
-                    price_change = ((latest_price - previous_price) / previous_price) * 100
+            if old_price_6h is not None and old_price_6h != 0:
+                price_change_6h = ((latest_price - old_price_6h) / old_price_6h) * 100
+            else:
+                price_change_6h = None
 
-                    if volume_increase >= 20 and abs(price_change) <= 10:
-                        crypto_data_to_display.append({
-                            "name": coin[1],
-                            "symbol": coin[2],
-                            "rank": coin[3],
-                            "current_volume": format_volume(latest_volume),
-                            "volume_increase": volume_increase,
-                            "current_price": format_price(latest_price),
-                            "price_change": price_change,
-                            "periods_of_growth": min(periods_of_growth, 5),
-                            "time_of_growth": time_of_growth,
-                            "average_volume_increase_percentage": average_volume_increase_percentage
-                        })
+            # ---------------------------------------------------
+            # 5) Проверяем условия отбора:
+            #    (A) 6h volume >= 50% ИЛИ 1h volume >= 50%
+            #    И 6h price change <= 10% (по модулю)
+            # ---------------------------------------------------
+            #  -- Если не можем посчитать price_change_6h, считаем что монету пропускаем,
+            #     т.к. неизвестна цена, нет смысла выводить (ведь "и при этом" часть невыполнима).
+            #  -- Аналогично, если нет volume_increase_6h и нет volume_increase_1h,
+            #     то тоже пропускаем.
+            # ---------------------------------------------------
+            if price_change_6h is None:
+                continue  # нет цены 6 часов назад — пропускаем
+
+            abs_price_change_6h = abs(price_change_6h)
+
+            # Логика по объёму: нужно, чтобы хотя бы одно из значений >= 50
+            condition_volume = False
+
+            if volume_increase_6h is not None and volume_increase_6h >= 50:
+                condition_volume = True
+            if volume_increase_1h is not None and volume_increase_1h >= 50:
+                condition_volume = True
+
+            # Логика по цене: цена менялась не более чем на 10% за 6ч
+            condition_price = (abs_price_change_6h <= 10)
+
+            if condition_volume and condition_price:
+                crypto_data_to_display.append({
+                    "name": coin[1],
+                    "symbol": coin[2],
+                    "rank": coin[3],
+                    "current_volume": format_volume(latest_volume),
+                    "volume_increase_6h": volume_increase_6h if volume_increase_6h is not None else 0,
+                    "volume_increase_1h": volume_increase_1h if volume_increase_1h is not None else 0,
+                    "current_price": format_price(latest_price),
+                    "price_change_6h": price_change_6h,
+                })
 
         if request.method == "POST":
             name = request.form.get("name")
