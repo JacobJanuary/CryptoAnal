@@ -57,9 +57,9 @@ def get_grok_analytics(name, symbol):
         # Выводим в консоль весь ответ от API
         print("[get_grok_analytics] Полный ответ от API:", response)
 
-        if response and isinstance(response.content, str):
-            print("[get_grok_analytics] Содержимое ответа:", response.content)
-            return {"content": response.content}
+        if response and isinstance(response.content[0].text, str):
+            print("[get_grok_analytics] Содержимое ответа:", response.content[0].text)
+            return {"content": response.content[0].text}
         else:
             error_msg = "Unexpected response from API"
             print("[get_grok_analytics]", error_msg)
@@ -91,9 +91,9 @@ def get_grok_invest(name, symbol):
         # Выводим в консоль весь ответ от API
         print("[get_grok_invest] Полный ответ от API:", response)
 
-        if response and isinstance(response.content, str):
-            print("[get_grok_invest] Содержимое ответа:", response.content)
-            return {"content": response.content}
+        if response and isinstance(response.content[0].text, str):
+            print("[get_grok_invest] Содержимое ответа:", response.content[0].text)
+            return {"content": response.content[0].text}
         else:
             error_msg = "Unexpected response from API"
             print("[get_grok_invest]", error_msg)
@@ -211,18 +211,18 @@ def index():
             mysql.connection.commit()
 
             # Получаем информацию по инвестициям
-            #invest = get_grok_invest(name, symbol)
-            #if "error" in invest:
-            #    print("[index] Ошибка при получении данных об инвестициях:", invest["error"])
-            #    return jsonify(invest), 400
+            invest = get_grok_invest(name, symbol)
+            if "error" in invest:
+                print("[index] Ошибка при получении данных об инвестициях:", invest["error"])
+                return jsonify(invest), 400
 
-            #ai_invest = invest.get("content")
-            #print("[index] Полученный AI_invest:", ai_invest)
+            ai_invest = invest.get("content")
+            print("[index] Полученный AI_invest:", ai_invest)
 
-            #cur.execute("""
-            #    UPDATE cryptocurrencies SET AI_invest = %s WHERE name = %s AND symbol = %s
-            #""", (ai_invest, name, symbol))
-            # mysql.connection.commit()
+            cur.execute("""
+                UPDATE cryptocurrencies SET AI_invest = %s WHERE name = %s AND symbol = %s
+            """, (ai_invest, name, symbol))
+            mysql.connection.commit()
 
             return jsonify({"content": ai_text})
 
