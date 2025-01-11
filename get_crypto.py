@@ -56,8 +56,8 @@ try:
             # Если не нашли, вставляем новую запись
             if not row:
                 cursor.execute('''
-                    INSERT INTO cryptocurrencies (id, cryptorank, name, symbol)
-                    VALUES (%s, %s, %s, %s)
+                    INSERT INTO cryptocurrencies (id, cryptorank, name, symbol, SectorID)
+                    VALUES (%s, %s, %s, %s, '0')
                 ''', (currency_id, rank, name, symbol))
 
     conn.commit()
