@@ -210,6 +210,7 @@ def index():
 
             if condition_volume and condition_price:
                 crypto_data_to_display.append({
+                    "id": coin[0],
                     "name": coin[1],
                     "symbol": coin[2],
                     "rank": coin[3],
