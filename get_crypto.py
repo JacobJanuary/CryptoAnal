@@ -38,34 +38,30 @@ try:
     conn = mysql.connector.connect(**db_config)
     cursor = conn.cursor()
 
-    # Создание базы данных, если она не существует
-    cursor.execute(f"CREATE DATABASE IF NOT EXISTS {db_config['database']}")
-    cursor.execute(f"USE {db_config['database']}")
+    # Далее предполагается, что БД и таблица cryptocurrencies УЖЕ существуют
+    # Если нужно, отдельно делайте CREATE DATABASE / CREATE TABLE
 
-    # Создание таблицы, если она не существует
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS cryptocurrencies (
-            id INT NOT NULL PRIMARY KEY, -- PRIMARY KEY для уникального идентификатора
-            cryptorank INT DEFAULT NULL,       -- Ранг, допускается NULL
-            name VARCHAR(255) NOT NULL,  -- Имя криптовалюты, обязательно
-            symbol VARCHAR(50) NOT NULL  -- Символ криптовалюты, обязательно
-        );
-    ''')
-
-    # Очистка таблицы перед добавлением новых данных (опционально, если нужно полное обновление)
-    cursor.execute("TRUNCATE TABLE cryptocurrencies")
-
-    # Вставка данных в базу данных
+    # Вставка данных в базу данных (только новых записей)
     for currency in data:
         if currency.get('is_active') == 1:
-            cursor.execute('''
-                INSERT INTO cryptocurrencies (id, rank, name, symbol)
-                VALUES (%s, %s, %s, %s)
-            ''', (currency['id'], currency.get('rank'), currency['name'], currency['symbol']))
+            currency_id = currency['id']
+            rank = currency.get('rank')
+            name = currency['name']
+            symbol = currency['symbol']
+
+            # Проверяем, есть ли уже такая запись по ID
+            cursor.execute("SELECT id FROM cryptocurrencies WHERE id = %s", (currency_id,))
+            row = cursor.fetchone()
+
+            # Если не нашли, вставляем новую запись
+            if not row:
+                cursor.execute('''
+                    INSERT INTO cryptocurrencies (id, cryptorank, name, symbol)
+                    VALUES (%s, %s, %s, %s)
+                ''', (currency_id, rank, name, symbol))
 
     conn.commit()
-
-    print("Данные успешно сохранены в базу данных MySQL")
+    print("Данные успешно сохранены в базу данных MySQL (добавлены только новые записи).")
 
 except requests.exceptions.RequestException as e:
     print(f"Ошибка при запросе к API: {e}")
@@ -74,7 +70,6 @@ except mysql.connector.Error as e:
 except KeyError as e:
     print(f"Ошибка в структуре данных API (отсутствует ключ {e}): возможно, структура ответа API изменилась")
 finally:
-    if conn.is_connected():
+    if 'conn' in locals() and conn.is_connected():
         cursor.close()
         conn.close()
-#изменить скрипт, проверить в БД по ID, если токена нет в базе - добавить
