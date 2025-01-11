@@ -108,7 +108,7 @@ try:
             GROUP BY coin_id
         ) AS latest_stats ON c.id = latest_stats.coin_id
         INNER JOIN coins_volume_stats cvs ON latest_stats.coin_id = cvs.coin_id AND latest_stats.max_datetime = cvs.datetime
-        WHERE cvs.volume < 100000
+        WHERE cvs.volume < 10000
     ''')
     coins_to_delete = cursor.fetchall()
 
@@ -139,7 +139,7 @@ try:
         print(f"Удалено {deleted_count_volume_stats} записей из таблицы coins_volume_stats.")
         print(f"Удалено {deleted_count_cryptocurrencies} записей из таблицы cryptocurrencies.")
     else:
-        print("Криптовалют с объемом торгов менее 100000 не найдено.")
+        print("Криптовалют с объемом торгов менее 10000 не найдено.")
 
 except mysql.connector.Error as e:
     print(f"Ошибка базы данных: {e}")
