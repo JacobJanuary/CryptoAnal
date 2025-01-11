@@ -77,3 +77,4 @@ finally:
     if conn.is_connected():
         cursor.close()
         conn.close()
+#изменить скрипт, проверить в БД по ID, если токена нет в базе - добавить

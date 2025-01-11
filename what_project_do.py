@@ -15,9 +15,9 @@ DB_PASSWORD = os.getenv("MYSQL_PASSWORD", "password")
 DB_NAME = os.getenv("MYSQL_DATABASE", "crypto_db")
 
 # ==================================================================
-# Настройки OpenAI (ключ может быть взят из переменных окружения либо прописан напрямую)
+# Настройки OpenAI
 # ==================================================================
-openai.api_key = os.getenv("OPENAI_API_KEY")  # Или присвойте напрямую (не рекомендуется хранить ключ в коде)
+openai.api_key = os.getenv("OPENAI_API_KEY")  # Или пропишите напрямую
 
 PROMPT_TEMPLATE = """Check all coins from this prompt one by one.
 If it's related to Ai project, add it to list 1,
@@ -44,11 +44,11 @@ def fetch_all_cryptocurrency_names():
     )
     cursor = db.cursor()
 
-    # В зависимости от вашей структуры таблицы скорректируйте SELECT
+    # В зависимости от структуры таблицы, возможно, нужно изменить SELECT
     cursor.execute("SELECT name FROM cryptocurrencies")
     rows = cursor.fetchall()
 
-    # rows будет списком кортежей [(name1,), (name2,), ...]
+    # rows -> [(name1,), (name2,), ...]
     names = [row[0] for row in rows]
 
     cursor.close()
@@ -67,7 +67,7 @@ def chunkify(lst, chunk_size=100):
 def call_chatgpt_for_coins(coins_chunk):
     """
     Отправляем в ChatGPT список монет (до 100 штук).
-    Возвращаем текстовый ответ ChatGPT, используя новое API (>=1.0.0).
+    Возвращаем текстовый ответ ChatGPT, используя метод ChatCompletion.create().
     """
     # Формируем строку со списком монет
     coins_str = ", ".join(coins_chunk)
@@ -76,13 +76,13 @@ def call_chatgpt_for_coins(coins_chunk):
     prompt = PROMPT_TEMPLATE + f"\nCoins: {coins_str}\n"
 
     # Запрос к ChatGPT (используем модель gpt-3.5-turbo, можно менять на другую)
-    response = openai.chat_completions.create(
+    response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}],
         temperature=0,
     )
 
-    # В новом API результат находится в response.choices[0].message.content
+    # Содержимое ответа находится в response.choices[0].message.content
     return response.choices[0].message.content
 
 
@@ -90,22 +90,20 @@ def parse_chatgpt_response(response_text):
     """
     Пытаемся вытащить три списка:
         {'AI': [...], 'MEME': [...], 'REAL': [...]}
-    из ответа ChatGPT, который может выглядеть как:
+    из ответа ChatGPT, который может выглядеть так:
         {'AI': ['coin1', 'coin2']};
         {'MEME': ['coin3', 'coin4']};
         {'REAL': ['coin5']}
 
-    Из-за того, что ChatGPT может вернуть разные форматы, используем простой
-    текстовый парсинг: разбиваем по '};', приводим одинарные кавычки к двойным,
-    и пытаемся загрузить как JSON.
+    Т.к. ChatGPT может вернуть формат с точкой с запятой,
+    используем простой парсер: разбиваем по '};', пытаемся
+    распарсить каждый кусок как JSON (после замены одинарных кавычек на двойные).
     """
-    # Удалим все переводы строк для удобства
     text_clean = response_text.replace("\n", " ")
 
-    # Разбиваем по "};" (каждый кусок должен содержать словарь вида {'AI': [...]} )
+    # Разбиваем по "};"
     parts = text_clean.split("};")
 
-    # Итоговая структура
     result = {
         "AI": [],
         "MEME": [],
@@ -114,17 +112,15 @@ def parse_chatgpt_response(response_text):
 
     for part in parts:
         fragment = part.strip()
-        # Удаляем лишние символы в конце (если не было '}' - добавляем)
         if not fragment.endswith("}"):
             fragment += "}"
 
-        # Заменяем одинарные кавычки на двойные, чтобы можно было распарсить JSON
+        # Заменяем одинарные кавычки на двойные
         json_like = fragment.replace("'", "\"")
 
         try:
             parsed_obj = json.loads(json_like)
-
-            # parsed_obj может выглядеть как {"AI": ["coin1", "coin2"]}
+            # parsed_obj -> {"AI": [...]} или {"MEME": [...]} или {"REAL": [...]}
             if "AI" in parsed_obj:
                 result["AI"].extend(parsed_obj["AI"])
             if "MEME" in parsed_obj:
@@ -132,7 +128,6 @@ def parse_chatgpt_response(response_text):
             if "REAL" in parsed_obj:
                 result["REAL"].extend(parsed_obj["REAL"])
         except Exception as e:
-            # Если не получается распарсить - просто пропускаем
             print(f"Не удалось распарсить кусок: {json_like}\nОшибка: {e}")
 
     return result
