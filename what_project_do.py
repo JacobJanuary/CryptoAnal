@@ -4,6 +4,7 @@ import os
 import json
 import math
 import MySQLdb
+from dotenv import load_dotenv
 
 # Из новой версии библиотеки:
 # см. https://github.com/openai/openai-python#usage
@@ -20,6 +21,7 @@ DB_NAME = os.getenv("MYSQL_DATABASE", "crypto_db")
 # ==================================================================
 # Настройки OpenAI
 # ==================================================================
+load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # или пропишите напрямую
 PROMPT_TEMPLATE = """Check all coins from this prompt one by one.
 If it's related to Ai project, add it to list 1,
@@ -137,6 +139,7 @@ def parse_chatgpt_response(response_text):
 
 def main():
     # Инициализируем клиент OpenAI
+    print("MY OPENAI_API_KEY:", repr(OPENAI_API_KEY))
     client = OpenAI(api_key=OPENAI_API_KEY)
 
     # Получаем все имена монет
