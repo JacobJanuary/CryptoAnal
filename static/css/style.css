@@ -122,3 +122,6 @@ button {
 button:hover {
     background-color: #0056b3;
 }
+.sector-ai { background-color: #d1f7d1; /* очень светлый зеленый */ }
+.sector-meme { background-color: #d1ffd1; }
+.sector-real { background-color: #eeeeee; }

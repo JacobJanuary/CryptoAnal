@@ -108,7 +108,7 @@ def get_grok_invest(name, symbol):
 def index():
     try:
         cur = mysql.connection.cursor()
-        cur.execute("SELECT id, name, symbol, cryptorank FROM cryptocurrencies")
+        cur.execute("SELECT id, name, symbol, cryptorank, SectorID FROM cryptocurrencies")
         cryptos = cur.fetchall()
 
         crypto_data_to_display = []
@@ -218,6 +218,7 @@ def index():
                     "volume_increase_1h": volume_increase_1h if volume_increase_1h is not None else 0,
                     "current_price": format_price(latest_price),
                     "price_change_6h": price_change_6h,
+                    "sector": coin[4],
                 })
 
         if request.method == "POST":

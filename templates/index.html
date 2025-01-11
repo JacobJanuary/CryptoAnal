@@ -35,8 +35,26 @@
         </thead>
         <tbody>
     {% for crypto in crypto_data %}
-    <tr>
-        <td>{{ crypto.name }}</td>
+    <tr
+    {% if crypto.sector_id == '1' %}
+        class="sector-ai"
+    {% elif crypto.sector_id == '2' %}
+        class="sector-meme"
+    {% elif crypto.sector_id == '3' %}
+        class="sector-real"
+    {% endif %}
+    >
+        <td>
+            {{ crypto.name }}
+            <!-- Добавим в скобках (AI, Meme, Real) -->
+            {% if crypto.sector_id == '1' %}
+                (AI)
+            {% elif crypto.sector_id == '2' %}
+                (Meme)
+            {% elif crypto.sector_id == '3' %}
+                (Real)
+            {% endif %}
+        </td>
         <td>{{ crypto.symbol }}</td>
         <td>{{ crypto.rank }}</td>
         <td>{{ crypto.current_volume }}</td>
