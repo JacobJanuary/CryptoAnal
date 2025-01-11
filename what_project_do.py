@@ -19,6 +19,7 @@ DB_NAME = os.getenv("MYSQL_DATABASE", "crypto_db")
 # ==================================================================
 # Настройки OpenAI
 # ==================================================================
+load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # или пропишите напрямую
 MODEL_NAME = "o1-preview"
 
