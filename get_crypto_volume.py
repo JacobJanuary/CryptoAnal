@@ -108,7 +108,7 @@ try:
             GROUP BY coin_id
         ) AS latest_stats ON c.id = latest_stats.coin_id
         INNER JOIN coins_volume_stats cvs ON latest_stats.coin_id = cvs.coin_id AND latest_stats.max_datetime = cvs.datetime
-        WHERE cvs.volume < 10000
+        WHERE cvs.volume < 9999
     ''')
     coins_to_delete = cursor.fetchall()
 
