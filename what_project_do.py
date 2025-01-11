@@ -1,14 +1,11 @@
-# what_project_do.py
-
 import os
 import json
 import math
 import MySQLdb
-from dotenv import load_dotenv
 
-# Из новой версии библиотеки:
-# см. https://github.com/openai/openai-python#usage
+# Импортируем OpenAI (новый клиент)
 from openai import OpenAI
+from dotenv import load_dotenv
 
 # ==================================================================
 # Настройки MySQL - замените на свои (или используйте свой способ подключения)
@@ -22,17 +19,21 @@ DB_NAME = os.getenv("MYSQL_DATABASE", "crypto_db")
 # Настройки OpenAI
 # ==================================================================
 load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # или пропишите напрямую
-PROMPT_TEMPLATE = """Check all coins from this prompt one by one.
-If it's related to Ai project, add it to list 1,
-if to meme coins - add it to list 2,
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # или пропишите напрямую, но небезопасно
+MODEL_NAME = "o1-preview"  # в примере указана эта модель
+PROMPT_SUFFIX = """
+Check all coins from this prompt one by one. 
+If it's related to Ai project, add it to list 1, 
+if to meme coins - add to list 2, 
 if to real-word assets project - to list 3.
 Answer - only 3 lists of AI-tokens, meme coins and real-world assets.
-Like
+
+Like 
 {'AI': ['coin1', 'coin2', 'coin3']};
 {'MEME': ['coin4', 'coin5', 'coin6']};
 {'REAL': ['coin7', 'coin8', 'coin9']};
 """
+
 
 def fetch_all_cryptocurrency_names():
     """
@@ -46,50 +47,57 @@ def fetch_all_cryptocurrency_names():
         db=DB_NAME
     )
     cursor = db.cursor()
-
     cursor.execute("SELECT name FROM cryptocurrencies")
     rows = cursor.fetchall()
 
-    # rows -> [(name1,), (name2,), ...]
-    names = [row[0] for row in rows]
+    names = [row[0] for row in rows]  # [(name1,), (name2,), ...] -> [name1, name2, ...]
 
     cursor.close()
     db.close()
     return names
+
 
 def chunkify(lst, chunk_size=100):
     """
     Разбивает список монет на чанки по 'chunk_size' штук.
     """
     for i in range(0, len(lst), chunk_size):
-        yield lst[i : i + chunk_size]
+        yield lst[i: i + chunk_size]
+
 
 def call_chatgpt_for_coins(client, coins_chunk):
     """
     Отправляем в ChatGPT список монет (до 100 штук).
-    Используем клиентский подход:
-        from openai import OpenAI
-        client = OpenAI(api_key=...)
+    Используем пример вызова API с 'model="o1-preview"' и 'messages',
+    где content - это список (с ключами "type": "text", "text": ...).
+
     Возвращаем текстовый ответ ChatGPT.
     """
-    # Формируем строку со списком монет
-    coins_str = ", ".join(coins_chunk)
+    # Склеиваем монеты в одну строку
+    coins_str = ",".join(coins_chunk)
 
-    # Создаём полный prompt
-    prompt = PROMPT_TEMPLATE + f"\nCoins: {coins_str}\n"
+    # Формируем контент (в массиве "content")
+    content_data = [
+        {
+            "type": "text",
+            "text": f"{coins_str}\n\n{PROMPT_SUFFIX}"
+        }
+    ]
 
-    # Выполняем запрос к ChatGPT (пример: модель "gpt-4o")
-    completion = client.chat.completions.create(
-        model="gpt-4o",
+    # Делаем запрос к API
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
         messages=[
-            {"role": "developer", "content": "You are a helpful assistant."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0
+            {
+                "role": "user",
+                "content": content_data
+            }
+        ]
     )
 
-    # Возвращаем только контент из первого варианта
-    return completion.choices[0].message["content"]
+    # Возвращаем текст из первого choice
+    return response.choices[0].message["content"]
+
 
 def parse_chatgpt_response(response_text):
     """
@@ -101,10 +109,10 @@ def parse_chatgpt_response(response_text):
         {'REAL': ['coin5']}
 
     Для простоты:
-    1) Заменяем переводы строк на пробелы.
-    2) Разбиваем по "};".
-    3) Меняем одинарные кавычки на двойные.
-    4) Парсим JSON и добавляем монеты в общий словарь.
+      1) Заменяем переводы строк на пробелы.
+      2) Разбиваем по "};".
+      3) Меняем одинарные кавычки на двойные.
+      4) Парсим JSON и добавляем монеты в общий словарь.
     """
     text_clean = response_text.replace("\n", " ")
     parts = text_clean.split("};")
@@ -117,10 +125,11 @@ def parse_chatgpt_response(response_text):
 
     for part in parts:
         fragment = part.strip()
+        # Если не заканчивается на "}", дополним
         if not fragment.endswith("}"):
             fragment += "}"
 
-        # Заменяем одинарные кавычки на двойные, чтобы можно было распарсить JSON
+        # Меняем одинарные кавычки на двойные
         json_like = fragment.replace("'", "\"")
 
         try:
@@ -137,43 +146,44 @@ def parse_chatgpt_response(response_text):
 
     return result
 
+
 def main():
     # Инициализируем клиент OpenAI
-    print("MY OPENAI_API_KEY:", repr(OPENAI_API_KEY))
     client = OpenAI(api_key=OPENAI_API_KEY)
 
     # Получаем все имена монет
     all_names = fetch_all_cryptocurrency_names()
     print(f"[INFO] Всего монет в таблице: {len(all_names)}")
 
-    # Итоговые списки для всех чанков
+    # Итоговые списки
     final_ai = []
     final_meme = []
     final_real = []
 
-    # Обрабатываем списки по 100 штук
-    for chunk in chunkify(all_names, chunk_size=100):
+    # Идём по чанкам
+    for chunk in chunkify(all_names, 100):
         print(f"[INFO] Обрабатываем chunk из {len(chunk)} монет, например: {chunk[:5]} ...")
 
-        # Вызываем ChatGPT
+        # Запрашиваем у ChatGPT
         chatgpt_response = call_chatgpt_for_coins(client, chunk)
 
         # Парсим ответ
         parsed = parse_chatgpt_response(chatgpt_response)
 
-        # Расширяем наши итоговые списки
+        # Добавляем к общим спискам
         final_ai.extend(parsed["AI"])
         final_meme.extend(parsed["MEME"])
         final_real.extend(parsed["REAL"])
 
-    # После обработки всех чанков выводим суммарные результаты
+    # Вывод результата
     print("\n====== РЕЗУЛЬТАТ ======")
     print("AI-токены:")
     print(final_ai)
     print("\nMeme-токены:")
     print(final_meme)
-    print("\nReal-world Assets:")
+    print("\nReal-world assets:")
     print(final_real)
+
 
 if __name__ == "__main__":
     main()
