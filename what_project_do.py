@@ -2,10 +2,11 @@ import os
 import json
 import math
 import MySQLdb
-
-# Импортируем OpenAI (новый клиент)
-from openai import OpenAI
 from dotenv import load_dotenv
+from openai import OpenAI
+
+# Считываем переменные окружения из .env
+load_dotenv()
 
 # ==================================================================
 # Настройки MySQL - замените на свои (или используйте свой способ подключения)
@@ -18,9 +19,9 @@ DB_NAME = os.getenv("MYSQL_DATABASE", "crypto_db")
 # ==================================================================
 # Настройки OpenAI
 # ==================================================================
-load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # или пропишите напрямую, но небезопасно
-MODEL_NAME = "o1-preview"  # в примере указана эта модель
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # или пропишите напрямую
+MODEL_NAME = "o1-preview"
+
 PROMPT_SUFFIX = """
 Check all coins from this prompt one by one. 
 If it's related to Ai project, add it to list 1, 
@@ -67,9 +68,9 @@ def chunkify(lst, chunk_size=100):
 
 def call_chatgpt_for_coins(client, coins_chunk):
     """
-    Отправляем в ChatGPT список монет (до 100 штук).
-    Используем пример вызова API с 'model="o1-preview"' и 'messages',
-    где content - это список (с ключами "type": "text", "text": ...).
+    Отправляем в ChatGPT список монет (до 100 штук),
+    используя формат из вашего примера (model="o1-preview" и 'messages'),
+    где 'content' — список словарей с {"type": "text", "text": ...}.
 
     Возвращаем текстовый ответ ChatGPT.
     """
@@ -95,8 +96,8 @@ def call_chatgpt_for_coins(client, coins_chunk):
         ]
     )
 
-    # Возвращаем текст из первого choice
-    return response.choices[0].message["content"]
+    # Возвращаем содержимое (теперь используем .content)
+    return response.choices[0].message.content
 
 
 def parse_chatgpt_response(response_text):
