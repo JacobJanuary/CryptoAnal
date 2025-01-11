@@ -218,7 +218,7 @@ def index():
                     "volume_increase_1h": volume_increase_1h if volume_increase_1h is not None else 0,
                     "current_price": format_price(latest_price),
                     "price_change_6h": price_change_6h,
-                    "sector": coin[4],
+                    "sector_id": coin[4],
                 })
 
         if request.method == "POST":
