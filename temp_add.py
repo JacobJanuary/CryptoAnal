@@ -1,4 +1,5 @@
 import os
+import re
 import MySQLdb
 from dotenv import load_dotenv
 
@@ -22,15 +23,27 @@ def main():
     )
     cursor = db.cursor()
 
-    # Запрашиваем у пользователя списки монет
-    ai_input = input("Введите список AI-монет (через запятую): ")
-    meme_input = input("Введите список MEME-монет (через запятую): ")
-    real_input = input("Введите список REAL-монет (через запятую): ")
+    # --- Функция парсинга: извлекает все подстроки в одинарных кавычках ---
+    def parse_coins_from_input(user_input: str):
+        """
+        Ищет все фрагменты вида 'что-то' в строке.
+        Возвращает список найденных значений без кавычек.
+        Пример:
+            Ввод: "'KCAL', 'DIMO', 'Hivemapper'"
+            Вывод: ["KCAL", "DIMO", "Hivemapper"]
+        """
+        return re.findall(r"'([^']*)'", user_input)
 
-    # Преобразуем каждую строку в список названий (убираем лишние пробелы)
-    ai_coins = [coin.strip() for coin in ai_input.split(",") if coin.strip()]
-    meme_coins = [coin.strip() for coin in meme_input.split(",") if coin.strip()]
-    real_coins = [coin.strip() for coin in real_input.split(",") if coin.strip()]
+    # Запрашиваем у пользователя списки монет
+    print("Введите список монет в формате: 'KCAL', 'DIMO', 'Hivemapper', ...")
+    ai_input = input("Список AI-монет: ")
+    meme_input = input("Список MEME-монет: ")
+    real_input = input("Список REAL-монет: ")
+
+    # Преобразуем ввод в списки:
+    ai_coins = parse_coins_from_input(ai_input)
+    meme_coins = parse_coins_from_input(meme_input)
+    real_coins = parse_coins_from_input(real_input)
 
     # Обновляем SectorID для каждого списка
     # 1) AI -> SectorID = '1'
