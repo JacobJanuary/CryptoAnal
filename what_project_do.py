@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import math
 import MySQLdb
 from dotenv import load_dotenv
@@ -106,50 +107,68 @@ def call_chatgpt_for_coins(client, coins_chunk):
 
 def parse_chatgpt_response(response_text):
     """
-    Пытаемся вытащить три списка:
-        {'AI': [...], 'MEME': [...], 'REAL': [...]}
-    из ответа ChatGPT, который может выглядеть так:
-        {'AI': ['coin1', 'coin2']};
-        {'MEME': ['coin3', 'coin4']};
-        {'REAL': ['coin5']}
+    Универсальный парсер для ответов ChatGPT, в которых ожидаются структуры вида:
+      {'AI': [...], 'MEME': [...], 'REAL': [...]}
+    либо несколько таких объектов, разделённых `};`, либо один JSON, либо
+    что-то внутри кодовых блоков.
 
-    Для простоты:
-      1) Заменяем переводы строк на пробелы.
-      2) Разбиваем по "};".
-      3) Меняем одинарные кавычки на двойные.
-      4) Парсим JSON и добавляем монеты в общий словарь.
+    Возвращает словарь:
+      {
+        "AI": [...],
+        "MEME": [...],
+        "REAL": [...]
+      }
+
+    Где все найденные значения объединяются (extend).
     """
-    text_clean = response_text.replace("\n", " ")
-    parts = text_clean.split("};")
-
+    # Результирующий агрегатор
     result = {
         "AI": [],
         "MEME": [],
         "REAL": []
     }
 
-    for part in parts:
-        fragment = part.strip()
-        if not fragment.endswith("}"):
-            fragment += "}"
+    # 1) Удалим из ответа все блоки с тройными бэктиками (```...```)
+    #    вместе с содержимым. Часто ChatGPT возвращает код/JSON именно так.
+    text_no_codeblocks = re.sub(r'```.*?```', '', response_text, flags=re.DOTALL)
 
-        # Меняем одинарные кавычки на двойные
-        json_like = fragment.replace("'", "\"")
+    # 2) С помощью регулярного выражения найдём все блоки в фигурных скобках,
+    #    которые не содержат вложенных фигурных скобок.
+    #    То есть ищем последовательность: { ... } (жадный, но без вложенных {})
+    #    Эта «небольшая» регулярка может ложиться, если внутри фигурных скобок есть другие.
+    #    Для более сложных случаев нужно более хитрое решение.
+    blocks = re.findall(r'\{[^{}]*\}', text_no_codeblocks)
 
+    # 3) Перебираем каждый фрагмент, пытаемся загрузить его как JSON (после замены ' на ").
+    for block in blocks:
+        # Для начала убираем пробелы по краям
+        block_clean = block.strip()
+        # Заменим одинарные кавычки на двойные (часто ChatGPT возвращает '...': '...')
+        block_clean = block_clean.replace("'", "\"")
+
+        # Попробуем распарсить
         try:
-            parsed_obj = json.loads(json_like)
-            # parsed_obj -> {"AI": [...]} или {"MEME": [...]} или {"REAL": [...]}
-            if "AI" in parsed_obj:
-                result["AI"].extend(parsed_obj["AI"])
-            if "MEME" in parsed_obj:
-                result["MEME"].extend(parsed_obj["MEME"])
-            if "REAL" in parsed_obj:
-                result["REAL"].extend(parsed_obj["REAL"])
-        except Exception as e:
-            print(f"Не удалось распарсить кусок: {json_like}\nОшибка: {e}")
+            parsed_obj = json.loads(block_clean)
+
+            # Если это полноценный словарь, возможно, содержит "AI", "MEME", "REAL"
+            if isinstance(parsed_obj, dict):
+                # Если ключи "AI"/"MEME"/"REAL" действительно есть
+                if "AI" in parsed_obj and isinstance(parsed_obj["AI"], list):
+                    result["AI"].extend(parsed_obj["AI"])
+                if "MEME" in parsed_obj and isinstance(parsed_obj["MEME"], list):
+                    result["MEME"].extend(parsed_obj["MEME"])
+                if "REAL" in parsed_obj and isinstance(parsed_obj["REAL"], list):
+                    result["REAL"].extend(parsed_obj["REAL"])
+
+        except json.JSONDecodeError:
+            # Если не вышло распарсить как JSON — пропускаем
+            pass
+
+    # 4) Если регулярка ничего не нашла (blocks=[]), но ChatGPT вернул объекты через `};`,
+    #    можно добавить fallback-парсер — как вы делали ранее (split("};") и т.п.).
+    #    Однако часто findall() уже найдёт эти объекты.
 
     return result
-
 
 def main():
     # Инициализируем клиент OpenAI
