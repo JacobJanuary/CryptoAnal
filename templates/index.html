@@ -30,7 +30,7 @@
         <th data-type="percent">Price change (6ч)</th>
         <th>Ссылка на CMC</th>
         <th>AI Аналитика</th>
-        <th>AI Фонды</th>
+        <th>Избранное</th>
         </tr>
         </thead>
         <tbody>
@@ -71,7 +71,25 @@
                 AI Аналитика
             </button>
         </td>
-        <td><button class="ai-funds">AI Фонды</button></td>
+        <!-- Столбец "Избранное" -->
+        <td>
+            <!--
+                 isFavourites — булево поле в БД.
+                 Тут в шаблоне оно может приходить как True/False (Python bool)
+                 или "true"/"false" (строка).
+                 В Jinja2 можно проверить это через if/else.
+            -->
+            <button
+               id="favorite-button-{{ crypto.id }}"
+               onclick="toggleFavorite('{{ crypto.id }}', {{ 'true' if crypto.isFavourites else 'false' }})"
+            >
+              {% if crypto.isFavourites %}
+                Удалить
+              {% else %}
+                Добавить
+              {% endif %}
+            </button>
+        </td>
     </tr>
     {% endfor %}
     </tbody>

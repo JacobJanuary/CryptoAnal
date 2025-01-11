@@ -108,7 +108,7 @@ def get_grok_invest(name, symbol):
 def index():
     try:
         cur = mysql.connection.cursor()
-        cur.execute("SELECT id, name, symbol, cryptorank, SectorID FROM cryptocurrencies")
+        cur.execute("SELECT id, name, symbol, cryptorank, SectorID, isFavourites FROM cryptocurrencies")
         cryptos = cur.fetchall()
 
         crypto_data_to_display = []
@@ -219,6 +219,7 @@ def index():
                     "current_price": format_price(latest_price),
                     "price_change_6h": price_change_6h,
                     "sector_id": coin[4],
+                    "isFavourites": coin[5]
                 })
 
         if request.method == "POST":
@@ -274,7 +275,31 @@ def index():
         traceback.print_exc()
         return jsonify({"error": f"Ошибка: {e}"})
 
+# ----------------------------------------------
+# Обработчик /toggle_favourite вставляем сюда:
+# ----------------------------------------------
+@app.route("/toggle_favourite", methods=["POST"])
+def toggle_favourite():
+    try:
+        data = request.get_json()
+        coin_id = data.get("id")
+        new_val = data.get("isFavourites")  # True или False
 
+        if coin_id is None or new_val is None:
+            return jsonify({"error": "Не переданы необходимые данные"}), 400
+
+        bool_val = 1 if new_val else 0
+
+        cur = mysql.connection.cursor()
+        cur.execute("UPDATE cryptocurrencies SET isFavourites = %s WHERE id = %s", (bool_val, coin_id))
+        mysql.connection.commit()
+        cur.close()
+
+        return jsonify({"success": True})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 if __name__ == "__main__":
     # Включаем debug для более подробного вывода ошибок в консоль
     app.run(debug=True)

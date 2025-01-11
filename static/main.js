@@ -87,6 +87,52 @@ function sortTable(columnIndex, type) {
     table.dataset.sortDirection = direction;
 }
 
+// main.js
+
+function toggleFavorite(coinId, currentVal) {
+    // Определяем новое значение (true -> false, false -> true)
+    const newVal = !currentVal;
+
+    // Делаем запрос к Flask-приложению
+    fetch('/toggle_favourite', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            id: coinId,
+            isFavourites: newVal
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Ошибка сервера: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.error) {
+            alert(`Ошибка: ${data.error}`);
+            return;
+        }
+
+        // Если успех, меняем текст кнопки
+        const button = document.getElementById(`favorite-button-${coinId}`);
+        if (newVal) {
+            button.textContent = 'Удалить';
+        } else {
+            button.textContent = 'Добавить';
+        }
+
+        // Также нужно обновить сам onclick, чтобы при следующем нажатии правильно передавалось новое текущее значение
+        button.setAttribute('onclick', `toggleFavorite('${coinId}', ${newVal})`);
+    })
+    .catch(error => {
+        console.error('Ошибка при toggleFavorite:', error);
+        alert(`Произошла ошибка: ${error.message}`);
+    });
+}
+
 // Event listeners for modal buttons and sorting
 window.onload = function() {
     document.getElementById('close-modal').addEventListener('click', closeModal);
