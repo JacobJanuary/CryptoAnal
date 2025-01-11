@@ -1,8 +1,8 @@
 import os
 import json
-import re
 import math
 import MySQLdb
+import re
 from dotenv import load_dotenv
 from openai import OpenAI
 
@@ -10,7 +10,7 @@ from openai import OpenAI
 load_dotenv()
 
 # ==================================================================
-# Настройки MySQL - замените на свои (или используйте свой способ подключения)
+# Настройки MySQL
 # ==================================================================
 DB_HOST = os.getenv("MYSQL_HOST", "localhost")
 DB_USER = os.getenv("MYSQL_USER", "root")
@@ -37,10 +37,9 @@ Like
 """
 
 
-def fetch_all_cryptocurrency_names():
+def fetch_all_cryptocurrency_names_with_sector0():
     """
-    Забираем список всех криптовалют из таблицы 'cryptocurrencies'
-    (допустим, нас интересует колонка 'name').
+    Забираем список всех криптовалют, у которых SectorID = '0'
     """
     db = MySQLdb.connect(
         host=DB_HOST,
@@ -49,7 +48,8 @@ def fetch_all_cryptocurrency_names():
         db=DB_NAME
     )
     cursor = db.cursor()
-    cursor.execute("SELECT name FROM cryptocurrencies")
+    # Получаем только те, у кого SectorID = '0'
+    cursor.execute("SELECT name FROM cryptocurrencies WHERE SectorID = '0'")
     rows = cursor.fetchall()
 
     names = [row[0] for row in rows]  # [(name1,), (name2,), ...] -> [name1, name2, ...]
@@ -70,13 +70,9 @@ def chunkify(lst, chunk_size=100):
 def call_chatgpt_for_coins(client, coins_chunk):
     """
     Отправляем в ChatGPT список монет (до 100 штук).
-    Выводим в консоль сформированный запрос (content_data) и ответ от API (response).
     Возвращаем текстовый ответ ChatGPT.
     """
-    # Склеиваем монеты в одну строку
     coins_str = ",".join(coins_chunk)
-
-    # Формируем контент (в массиве "content")
     content_data = [
         {
             "type": "text",
@@ -84,10 +80,7 @@ def call_chatgpt_for_coins(client, coins_chunk):
         }
     ]
 
-    # Выводим в консоль часть запроса для отладки
     print("[DEBUG] Prompt content_data:", content_data)
-
-    # Делаем запрос к API
     response = client.chat.completions.create(
         model=MODEL_NAME,
         messages=[
@@ -98,114 +91,113 @@ def call_chatgpt_for_coins(client, coins_chunk):
         ]
     )
 
-    # Выводим весь объект ответа в консоль
     print("[DEBUG] Full API response:", response)
-
-    # Возвращаем содержимое ответа
     return response.choices[0].message.content
 
 
 def parse_chatgpt_response(response_text):
     """
-    Универсальный парсер для ответов ChatGPT, в которых ожидаются структуры вида:
-      {'AI': [...], 'MEME': [...], 'REAL': [...]}
-    либо несколько таких объектов, разделённых `};`, либо один JSON, либо
-    что-то внутри кодовых блоков.
-
-    Возвращает словарь:
-      {
-        "AI": [...],
-        "MEME": [...],
-        "REAL": [...]
-      }
-
-    Где все найденные значения объединяются (extend).
+    Универсальный парсер для извлечения AI/MEME/REAL.
+    Возвращает словарь {"AI": [...], "MEME": [...], "REAL": [...]}
+    с объединёнными списками, если в ответе несколько блоков.
     """
-    # Результирующий агрегатор
+    # Итоговый результат
     result = {
         "AI": [],
         "MEME": [],
         "REAL": []
     }
 
-    # 1) Удалим из ответа все блоки с тройными бэктиками (```...```)
-    #    вместе с содержимым. Часто ChatGPT возвращает код/JSON именно так.
+    # 1) Удалим блоки кода (```...```)
     text_no_codeblocks = re.sub(r'```.*?```', '', response_text, flags=re.DOTALL)
 
-    # 2) С помощью регулярного выражения найдём все блоки в фигурных скобках,
-    #    которые не содержат вложенных фигурных скобок.
-    #    То есть ищем последовательность: { ... } (жадный, но без вложенных {})
-    #    Эта «небольшая» регулярка может ложиться, если внутри фигурных скобок есть другие.
-    #    Для более сложных случаев нужно более хитрое решение.
+    # 2) Ищем все фрагменты в фигурных скобках (без вложенных {})
     blocks = re.findall(r'\{[^{}]*\}', text_no_codeblocks)
 
-    # 3) Перебираем каждый фрагмент, пытаемся загрузить его как JSON (после замены ' на ").
     for block in blocks:
-        # Для начала убираем пробелы по краям
         block_clean = block.strip()
-        # Заменим одинарные кавычки на двойные (часто ChatGPT возвращает '...': '...')
-        block_clean = block_clean.replace("'", "\"")
+        # если не оканчивается на '}'
+        if not block_clean.endswith("}"):
+            block_clean += "}"
 
-        # Попробуем распарсить
+        block_clean = block_clean.replace("'", "\"")  # заменяем одинарные кавычки
         try:
             parsed_obj = json.loads(block_clean)
-
-            # Если это полноценный словарь, возможно, содержит "AI", "MEME", "REAL"
             if isinstance(parsed_obj, dict):
-                # Если ключи "AI"/"MEME"/"REAL" действительно есть
+                # Проверяем, есть ли ключи AI, MEME, REAL
                 if "AI" in parsed_obj and isinstance(parsed_obj["AI"], list):
                     result["AI"].extend(parsed_obj["AI"])
                 if "MEME" in parsed_obj and isinstance(parsed_obj["MEME"], list):
                     result["MEME"].extend(parsed_obj["MEME"])
                 if "REAL" in parsed_obj and isinstance(parsed_obj["REAL"], list):
                     result["REAL"].extend(parsed_obj["REAL"])
-
         except json.JSONDecodeError:
-            # Если не вышло распарсить как JSON — пропускаем
             pass
 
-    # 4) Если регулярка ничего не нашла (blocks=[]), но ChatGPT вернул объекты через `};`,
-    #    можно добавить fallback-парсер — как вы делали ранее (split("};") и т.п.).
-    #    Однако часто findall() уже найдёт эти объекты.
-
     return result
+
 
 def main():
     # Инициализируем клиент OpenAI
     client = OpenAI(api_key=OPENAI_API_KEY)
 
-    # Получаем все имена монет
-    all_names = fetch_all_cryptocurrency_names()
-    print(f"[INFO] Всего монет в таблице: {len(all_names)}")
+    # 1) Получаем все имена монет с SectorID = '0'
+    all_names_sector0 = fetch_all_cryptocurrency_names_with_sector0()
+    print(f"[INFO] Всего монет в таблице с SectorID=0: {len(all_names_sector0)}")
 
-    # Итоговые списки
-    final_ai = []
-    final_meme = []
-    final_real = []
+    # Подключаемся к БД на время обработки
+    db = MySQLdb.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        passwd=DB_PASSWORD,
+        db=DB_NAME
+    )
+    cursor = db.cursor()
 
-    # Идём по чанкам
-    for chunk in chunkify(all_names, 100):
+    # 2) Обрабатываем списки по 100 штук
+    for chunk in chunkify(all_names_sector0, 100):
         print(f"[INFO] Обрабатываем chunk из {len(chunk)} монет, например: {chunk[:5]} ...")
 
-        # Запрашиваем у ChatGPT
+        # Вызываем ChatGPT
         chatgpt_response = call_chatgpt_for_coins(client, chunk)
 
         # Парсим ответ
         parsed = parse_chatgpt_response(chatgpt_response)
 
-        # Добавляем к общим спискам
-        final_ai.extend(parsed["AI"])
-        final_meme.extend(parsed["MEME"])
-        final_real.extend(parsed["REAL"])
+        # Результирующие списки
+        ai_list = set(parsed["AI"])  # множество для быстрого поиска
+        meme_list = set(parsed["MEME"])
+        real_list = set(parsed["REAL"])
 
-    # Вывод результата
-    print("\n====== РЕЗУЛЬТАТ ======")
-    print("AI-токены:")
-    print(final_ai)
-    print("\nMeme-токены:")
-    print(final_meme)
-    print("\nReal-world assets:")
-    print(final_real)
+        # 3) Проставляем сектор ID каждой монете из чанка
+        for name in chunk:
+            # Смотрим, к какому сектору отнесена монета
+            if name in ai_list:
+                new_sector = '1'
+            elif name in meme_list:
+                new_sector = '2'
+            elif name in real_list:
+                new_sector = '3'
+            else:
+                # Если не попало ни в один список — ставим '9'
+                new_sector = '9'
+
+            try:
+                cursor.execute(
+                    "UPDATE cryptocurrencies SET SectorID = %s WHERE name = %s",
+                    (new_sector, name)
+                )
+            except Exception as e:
+                print(f"[ERROR] Не удалось обновить монету {name}: {e}")
+
+        # После обработки чанка — коммитим
+        db.commit()
+
+    # Закрываем соединение
+    cursor.close()
+    db.close()
+
+    print("[INFO] Скрипт завершён.")
 
 
 if __name__ == "__main__":
