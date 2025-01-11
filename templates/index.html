@@ -36,22 +36,22 @@
         <tbody>
     {% for crypto in crypto_data %}
     <tr
-    {% if crypto.sector_id == '1' %}
+    {% if crypto.sector_id == 1 %}
         class="sector-ai"
-    {% elif crypto.sector_id == '2' %}
+    {% elif crypto.sector_id == 2 %}
         class="sector-meme"
-    {% elif crypto.sector_id == '3' %}
+    {% elif crypto.sector_id == 3 %}
         class="sector-real"
     {% endif %}
     >
         <td>
-            {{ crypto.name }}  {{ crypto.sector_id }}
+            {{ crypto.name }}
             <!-- Добавим в скобках (AI, Meme, Real) -->
-            {% if crypto.sector_id == '1' %}
+            {% if crypto.sector_id == 1 %}
                 (AI)
-            {% elif crypto.sector_id == '2' %}
+            {% elif crypto.sector_id == 2 %}
                 (Meme)
-            {% elif crypto.sector_id == '3' %}
+            {% elif crypto.sector_id == 3 %}
                 (Real)
             {% endif %}
         </td>
