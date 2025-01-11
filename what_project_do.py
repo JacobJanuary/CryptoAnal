@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 # Считываем переменные окружения из .env
-
+load_dotenv()
 
 # ==================================================================
 # Настройки MySQL - замените на свои (или используйте свой способ подключения)
@@ -19,8 +19,7 @@ DB_NAME = os.getenv("MYSQL_DATABASE", "crypto_db")
 # ==================================================================
 # Настройки OpenAI
 # ==================================================================
-load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # или пропишите напрямую
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 MODEL_NAME = "o1-preview"
 
 PROMPT_SUFFIX = """
@@ -69,10 +68,8 @@ def chunkify(lst, chunk_size=100):
 
 def call_chatgpt_for_coins(client, coins_chunk):
     """
-    Отправляем в ChatGPT список монет (до 100 штук),
-    используя формат из вашего примера (model="o1-preview" и 'messages'),
-    где 'content' — список словарей с {"type": "text", "text": ...}.
-
+    Отправляем в ChatGPT список монет (до 100 штук).
+    Выводим в консоль сформированный запрос (content_data) и ответ от API (response).
     Возвращаем текстовый ответ ChatGPT.
     """
     # Склеиваем монеты в одну строку
@@ -86,6 +83,9 @@ def call_chatgpt_for_coins(client, coins_chunk):
         }
     ]
 
+    # Выводим в консоль часть запроса для отладки
+    print("[DEBUG] Prompt content_data:", content_data)
+
     # Делаем запрос к API
     response = client.chat.completions.create(
         model=MODEL_NAME,
@@ -97,7 +97,10 @@ def call_chatgpt_for_coins(client, coins_chunk):
         ]
     )
 
-    # Возвращаем содержимое (теперь используем .content)
+    # Выводим весь объект ответа в консоль
+    print("[DEBUG] Full API response:", response)
+
+    # Возвращаем содержимое ответа
     return response.choices[0].message.content
 
 
@@ -127,7 +130,6 @@ def parse_chatgpt_response(response_text):
 
     for part in parts:
         fragment = part.strip()
-        # Если не заканчивается на "}", дополним
         if not fragment.endswith("}"):
             fragment += "}"
 
