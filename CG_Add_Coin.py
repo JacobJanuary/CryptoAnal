@@ -1,6 +1,7 @@
 import requests
 import mysql.connector
 import os
+import time
 from dotenv import load_dotenv
 from datetime import datetime
 import json
@@ -22,8 +23,7 @@ db_config = {
 
 def fetch_coin_details(coin_id):
     """
-    Запрашивает данные монеты по coin_id через API CoinGecko
-    и возвращает JSON-словарь.
+    Запрашивает данные монеты по coin_id через API CoinGecko и возвращает JSON-словарь.
     """
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}"
     headers = {
@@ -44,14 +44,14 @@ def fetch_coin_details(coin_id):
         coin_data = response.json()
         return coin_data
     except requests.exceptions.RequestException as e:
-        print(f"Ошибка при запросе к CoinGecko API: {e}")
+        print(f"Ошибка при запросе к CoinGecko API для монеты {coin_id}: {e}")
         return None
 
 
 def parse_datetime(dt_str):
     """
-    Преобразует строку в формате ISO-8601 в объект datetime.
-    Если преобразование неудачно – возвращает None.
+    Преобразует строку формата ISO-8601 в объект datetime.
+    Если преобразование не удаётся – возвращает None.
     """
     try:
         return datetime.fromisoformat(dt_str.rstrip("Z"))
@@ -61,8 +61,7 @@ def parse_datetime(dt_str):
 
 def print_coin_data(data):
     """
-    Выводит на экран основные данные монеты,
-    включая данные 24-часового изменения.
+    Выводит на экран выбранные данные монеты.
     """
     if data is None:
         print("Нет данных для отображения.")
@@ -72,7 +71,6 @@ def print_coin_data(data):
     print(f"ID: {data.get('id')}")
     print(f"Name: {data.get('name')}")
     print(f"Symbol: {data.get('symbol')}")
-
     categories = data.get("categories", [])
     print(f"Categories: {', '.join(categories) if categories else 'N/A'}")
 
@@ -100,8 +98,6 @@ def print_coin_data(data):
     atl_date = parse_datetime(market_data.get("atl_date", {}).get("usd") or "")
     market_cap = market_data.get("market_cap", {}).get("usd")
     total_volume = market_data.get("total_volume", {}).get("usd")
-
-    # Новые 24-часовые данные
     high_24h = market_data.get("high_24h", {}).get("usd")
     low_24h = market_data.get("low_24h", {}).get("usd")
     price_change_24h = market_data.get("price_change_24h")
@@ -239,11 +235,12 @@ def update_coin_in_db(data):
 
 def update_coin_categories(data):
     """
-    Обновляет связи монеты с категориями.
-    Для данной монеты удаляет старые связи в таблице coin_category_relation,
-    затем для каждого элемента из data['categories']:
-       - ищет в таблице CG_Categories запись, где name соответствует категории
-       - если найдена, вставляет связь (coin_id, category_id) в coin_category_relation
+    Обновляет связи монеты с категориями в таблице coin_category_relation.
+    Для данной монеты:
+      - Удаляет старые связи,
+      - Затем для каждого элемента из data['categories']:
+            ищет в таблице CG_Categories запись по совпадению имени,
+            если найдена, вставляет новую связь (coin_id, category_id).
     """
     coin_id = data.get("id")
     if not coin_id:
@@ -263,7 +260,7 @@ def update_coin_categories(data):
         delete_query = "DELETE FROM coin_category_relation WHERE coin_id = %s"
         cursor.execute(delete_query, (coin_id,))
 
-        # Для каждой категории ищем category_id в CG_Categories по совпадению имени
+        # Для каждой категории, ищем category_id в CG_Categories по совпадению имени
         select_query = "SELECT category_id FROM CG_Categories WHERE name = %s"
         insert_query = "INSERT INTO coin_category_relation (coin_id, category_id) VALUES (%s, %s)"
 
@@ -286,18 +283,45 @@ def update_coin_categories(data):
             conn.close()
 
 
+def get_coin_ids_for_update():
+    """
+    Возвращает список coin_id из таблицы coin_gesco_coins, у которых поле description_en не пустое или не NULL.
+    """
+    coin_ids = []
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor()
+        # Выбираем все записи, где description_en не NULL и не пустое (после обрезки пробелов)
+        query = "SELECT id FROM coin_gesco_coins WHERE description_en IS NOT NULL AND TRIM(description_en) != ''"
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        coin_ids = [row[0] for row in rows]
+    except mysql.connector.Error as e:
+        print(f"Ошибка при выборке coin_id для обновления: {e}")
+    finally:
+        if 'conn' in locals() and conn.is_connected():
+            cursor.close()
+            conn.close()
+    return coin_ids
+
+
 def main():
-    coin_id_input = input("Введите coin_id (например, bitcoin): ").strip()
-    coin_data = fetch_coin_details(coin_id_input)
-    if coin_data:
-        # Выводим данные монеты на экран
-        print_coin_data(coin_data)
-        # Обновляем запись в таблице coin_gesco_coins
-        update_coin_in_db(coin_data)
-        # Обновляем связи монеты с категориями в таблице coin_category_relation
-        update_coin_categories(coin_data)
-    else:
-        print("Не удалось получить данные монеты.")
+    # Получаем список coin_id для обновления
+    coin_ids = get_coin_ids_for_update()
+    print(f"Найдено {len(coin_ids)} монет для обновления.")
+
+    # Для ограничения API до 30 запросов в минуту устанавливаем задержку 2 секунды между запросами
+    for coin_id in coin_ids:
+        print(f"\nОбработка монеты {coin_id}...")
+        coin_data = fetch_coin_details(coin_id)
+        if coin_data:
+            print_coin_data(coin_data)
+            update_coin_in_db(coin_data)
+            update_coin_categories(coin_data)
+        else:
+            print(f"Не удалось получить данные для монеты {coin_id}.")
+        # Задержка в 2 секунды для соблюдения лимита 30 запросов в минуту
+        time.sleep(2)
 
 
 if __name__ == "__main__":
