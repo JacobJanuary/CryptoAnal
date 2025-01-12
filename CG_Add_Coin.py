@@ -11,7 +11,7 @@ load_dotenv()
 # Получаем API-ключ CoinGecko (если требуется)
 COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY", "")
 
-# Конфигурация подключения к MySQL
+# Конфигурация подключения к базе данных
 db_config = {
     'host': os.getenv("MYSQL_HOST", "localhost"),
     'user': os.getenv("MYSQL_USER", "root"),
@@ -23,7 +23,7 @@ db_config = {
 def fetch_coin_details(coin_id):
     """
     Запрашивает данные монеты по coin_id через API CoinGecko
-    и возвращает полученный JSON-словарь.
+    и возвращает JSON-словарь.
     """
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}"
     headers = {
@@ -31,10 +31,10 @@ def fetch_coin_details(coin_id):
         "x-cg-demo-api-key": COINGECKO_API_KEY
     }
     params = {
-        "localization": "false",  # не возвращать переводы
-        "tickers": "false",  # не возвращать тикеры
-        "market_data": "true",  # возвращать рыночные данные
-        "community_data": "true",  # возвращать данные сообщества
+        "localization": "false",
+        "tickers": "false",
+        "market_data": "true",
+        "community_data": "true",
         "developer_data": "false",
         "sparkline": "false"
     }
@@ -50,8 +50,8 @@ def fetch_coin_details(coin_id):
 
 def parse_datetime(dt_str):
     """
-    Преобразует ISO-8601 строку в объект datetime.
-    Если преобразование не удается, возвращает None.
+    Преобразует строку в формате ISO-8601 в объект datetime.
+    Если преобразование неудачно – возвращает None.
     """
     try:
         return datetime.fromisoformat(dt_str.rstrip("Z"))
@@ -61,7 +61,8 @@ def parse_datetime(dt_str):
 
 def print_coin_data(data):
     """
-    Выводит на экран некоторые основные данные монеты.
+    Выводит на экран основные данные монеты,
+    включая данные 24-часового изменения.
     """
     if data is None:
         print("Нет данных для отображения.")
@@ -100,23 +101,34 @@ def print_coin_data(data):
     market_cap = market_data.get("market_cap", {}).get("usd")
     total_volume = market_data.get("total_volume", {}).get("usd")
 
+    # Новые 24-часовые данные
+    high_24h = market_data.get("high_24h", {}).get("usd")
+    low_24h = market_data.get("low_24h", {}).get("usd")
+    price_change_24h = market_data.get("price_change_24h")
+    price_change_percentage_24h = market_data.get("price_change_percentage_24h")
+
     print("\n--- Market Data (USD) ---")
     print(f"Current Price: {current_price}")
-    print(f"ATH: {ath} (Change: {ath_change_percentage}%, Date: {ath_date})")
-    print(f"ATL: {atl} (Change: {atl_change_percentage}%, Date: {atl_date})")
+    print(f"ATH: {ath} (Change: {ath_change_percentage}% on {ath_date})")
+    print(f"ATL: {atl} (Change: {atl_change_percentage}% on {atl_date})")
     print(f"Market Cap: {market_cap}")
     print(f"Total Volume: {total_volume}")
+    print("\n--- 24h Data ---")
+    print(f"24h High: {high_24h}")
+    print(f"24h Low: {low_24h}")
+    print(f"24h Price Change: {price_change_24h}")
+    print(f"24h Price Change Percentage: {price_change_percentage_24h}")
 
     community_data = data.get("community_data", {})
     facebook_likes = community_data.get("facebook_likes")
     twitter_followers = community_data.get("twitter_followers")
     reddit_subscribers = community_data.get("reddit_subscribers")
-    telegram_count = community_data.get("telegram_channel_user_count")
+    telegram_channel_user_count = community_data.get("telegram_channel_user_count")
     print("\n--- Community Data ---")
     print(f"Facebook Likes: {facebook_likes}")
     print(f"Twitter Followers: {twitter_followers}")
     print(f"Reddit Subscribers: {reddit_subscribers}")
-    print(f"Telegram Channel Users: {telegram_count}")
+    print(f"Telegram Channel Users: {telegram_channel_user_count}")
 
     watchlist_users = data.get("watchlist_portfolio_users")
     print("\n--- Watchlist ---")
@@ -125,16 +137,20 @@ def print_coin_data(data):
 
 def update_coin_in_db(data):
     """
-    Обновляет запись в таблице coin_gesco_coins по данным, полученным из API.
-    Также обновляет связи в таблице coin_category_relation, основываясь на field
-    'categories', которые являются массивом строк.
+    Обновляет запись монеты в таблице coin_gesco_coins.
+    Обновляются поля: name, symbol, description_en,
+    sentiment_votes_up_percentage, sentiment_votes_down_percentage, market_cap_rank,
+    current_price_usd, ath_usd, ath_change_percentage_usd, ath_date_usd,
+    atl_usd, atl_change_percentage_usd, atl_date_usd, market_cap_usd, total_volume_usd,
+    high_24h_usd, low_24h_usd, price_change_24h_usd, price_change_percentage_24h,
+    facebook_likes, twitter_followers, reddit_subscribers, telegram_channel_user_count,
+    watchlist_portfolio_users.
     """
     coin_id = data.get("id")
     if not coin_id:
         print("Отсутствует coin_id в данных.")
         return
 
-    # Извлекаем поля для обновления из полученных данных (пример – можно расширить)
     name = data.get("name")
     symbol = data.get("symbol")
     description_en = data.get("description", {}).get("en", "")
@@ -152,9 +168,11 @@ def update_coin_in_db(data):
     atl_date_str = market_data.get("atl_date", {}).get("usd")
     market_cap_usd = market_data.get("market_cap", {}).get("usd")
     total_volume_usd = market_data.get("total_volume", {}).get("usd")
-    # Дополнительно можно добавить другие поля по необходимости
+    high_24h_usd = market_data.get("high_24h", {}).get("usd")
+    low_24h_usd = market_data.get("low_24h", {}).get("usd")
+    price_change_24h_usd = market_data.get("price_change_24h")
+    price_change_percentage_24h = market_data.get("price_change_percentage_24h")
 
-    # Преобразуем даты (если строки предоставлены)
     ath_date_usd = parse_datetime(ath_date_str) if ath_date_str else None
     atl_date_usd = parse_datetime(atl_date_str) if atl_date_str else None
 
@@ -166,7 +184,6 @@ def update_coin_in_db(data):
 
     watchlist_portfolio_users = data.get("watchlist_portfolio_users")
 
-    # Формируем запрос для обновления
     update_query = """
         UPDATE coin_gesco_coins SET
             name = %s,
@@ -184,6 +201,10 @@ def update_coin_in_db(data):
             atl_date_usd = %s,
             market_cap_usd = %s,
             total_volume_usd = %s,
+            high_24h_usd = %s,
+            low_24h_usd = %s,
+            price_change_24h_usd = %s,
+            price_change_percentage_24h = %s,
             facebook_likes = %s,
             twitter_followers = %s,
             reddit_subscribers = %s,
@@ -194,8 +215,10 @@ def update_coin_in_db(data):
     values = (
         name, symbol, description_en, sentiment_votes_up_percentage,
         sentiment_votes_down_percentage, market_cap_rank, current_price_usd,
-        ath_usd, ath_change_percentage_usd, ath_date_usd, atl_usd,
-        atl_change_percentage_usd, atl_date_usd, market_cap_usd, total_volume_usd,
+        ath_usd, ath_change_percentage_usd, ath_date_usd,
+        atl_usd, atl_change_percentage_usd, atl_date_usd,
+        market_cap_usd, total_volume_usd, high_24h_usd, low_24h_usd,
+        price_change_24h_usd, price_change_percentage_24h,
         facebook_likes, twitter_followers, reddit_subscribers, telegram_channel_user_count,
         watchlist_portfolio_users, coin_id
     )
@@ -205,7 +228,7 @@ def update_coin_in_db(data):
         cursor = conn.cursor()
         cursor.execute(update_query, values)
         conn.commit()
-        print(f"Запись монеты {coin_id} в таблице coin_gesco_coins успешно обновлена.")
+        print(f"Запись монеты {coin_id} успешно обновлена в таблице coin_gesco_coins.")
     except mysql.connector.Error as e:
         print(f"Ошибка обновления монеты {coin_id}: {e}")
     finally:
