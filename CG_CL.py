@@ -20,23 +20,22 @@ headers = {
     "x-cg-demo-api-key": COINGECKO_API_KEY
 }
 
-
 def fetch_coingecko_coins():
-    """Получает список всех монет через API CoinGecko (конечная точка /coins/list)."""
+    """Получает список всех монет через API CoinGecko (/coins/list)."""
     try:
         response = requests.get(url, headers=headers)
-        response.raise_for_status()  # выброс исключения при ошибках HTTP
+        response.raise_for_status()  # выбрасываем исключение при HTTP ошибке
         coins = response.json()  # каждая монета имеет поля: id, symbol, name
         return coins
     except requests.exceptions.RequestException as e:
         print(f"Ошибка при запросе к CoinGecko API: {e}")
         return []
 
-
 def save_coins_to_db(coins):
     """Сохраняет список монет в таблицу coin_gesco_coins.
        Если таблица не существует — создаёт её.
-       Не очищает данные, а добавляет только новые записи.
+       Добавляет только новые записи, не очищая таблицу.
+       Возвращает количество добавленных новых монет.
     """
     # Параметры подключения к БД
     db_config = {
@@ -45,6 +44,8 @@ def save_coins_to_db(coins):
         'password': os.getenv("MYSQL_PASSWORD", "password"),
         'database': os.getenv("MYSQL_DATABASE", "crypto_db")
     }
+
+    new_coins_count = 0
 
     try:
         conn = mysql.connector.connect(**db_config)
@@ -60,7 +61,7 @@ def save_coins_to_db(coins):
         """
         cursor.execute(create_table_query)
 
-        # Запрос для вставки; INSERT IGNORE предотвращает ошибку дублирования
+        # Запрос для вставки (INSERT IGNORE, чтобы не вставлять дубли)
         insert_query = """
             INSERT IGNORE INTO coin_gesco_coins (id, name, symbol)
             VALUES (%s, %s, %s);
@@ -72,27 +73,31 @@ def save_coins_to_db(coins):
             symbol = coin.get("symbol")
             if coin_id and name and symbol:
                 cursor.execute(insert_query, (coin_id, name, symbol))
+                # Если строка была вставлена (то есть rowcount равен 1), увеличиваем счетчик
+                if cursor.rowcount == 1:
+                    new_coins_count += 1
 
         conn.commit()
         print("Данные успешно сохранены в таблицу coin_gesco_coins")
+        return new_coins_count
 
     except mysql.connector.Error as e:
         print(f"Ошибка базы данных MySQL: {e}")
+        return 0
 
     finally:
         if conn.is_connected():
             cursor.close()
             conn.close()
 
-
 def main():
     coins = fetch_coingecko_coins()
     if coins:
         print(f"Получено {len(coins)} монет от CoinGecko")
-        save_coins_to_db(coins)
+        new_count = save_coins_to_db(coins)
+        print(f"Всего добавлено новых монет: {new_count}")
     else:
         print("Нет данных для сохранения.")
-
 
 if __name__ == "__main__":
     main()
