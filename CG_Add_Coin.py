@@ -292,7 +292,7 @@ def get_coin_ids_for_update():
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
         # Выбираем все записи, где description_en не NULL и не пустое (после обрезки пробелов)
-        query = "SELECT id FROM coin_gesco_coins WHERE description_en IS NOT NULL AND TRIM(description_en) != ''"
+        query = "SELECT id FROM coin_gesco_coins WHERE (description_en IS NULL OR TRIM(description_en) == ''"
         cursor.execute(query)
         rows = cursor.fetchall()
         coin_ids = [row[0] for row in rows]
