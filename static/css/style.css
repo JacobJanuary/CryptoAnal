@@ -122,6 +122,17 @@ button {
 button:hover {
     background-color: #0056b3;
 }
-.sector-ai { background-color: #d1f7d1; /* очень светлый зеленый */ }
-.sector-meme { background-color: #d1ffd1; }
-.sector-real { background-color: #eeeeee; }
+.sector-ai {
+    background-color: #c8e6c9; /* светло-зеленый — для AI */
+    color: #333; /* темный текст для контраста */
+}
+
+.sector-meme {
+    background-color: #fff9c4; /* светло-желтый — для MEME */
+    color: #333;
+}
+
+.sector-real {
+    background-color: silver; /* серебристый фон */
+    color: #000;
+}
