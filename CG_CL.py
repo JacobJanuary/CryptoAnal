@@ -6,29 +6,27 @@ from dotenv import load_dotenv
 # Загружаем переменные окружения из .env
 load_dotenv()
 
-# Получаем API ключ из переменных окружения
+# Получаем API-ключ для CoinGecko из переменных окружения
 COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY")
 if not COINGECKO_API_KEY:
     raise ValueError("Необходимо установить переменную окружения COINGECKO_API_KEY")
 
-# URL для получения списка монет через endpoint CoinGecko Markets
-# (для примера, используем vs_currency=usd, можно менять по необходимости)
-url = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd"
+# URL для получения списка всех монет
+url = "https://api.coingecko.com/api/v3/coins/list"
 
+# Передаём API-ключ через заголовок (если требуется)
 headers = {
     "accept": "application/json",
-    "x-cg-demo-api-key": COINGECKO_API_KEY  # передаем API-ключ через заголовок
+    "x-cg-demo-api-key": COINGECKO_API_KEY
 }
 
 
 def fetch_coingecko_coins():
-    """Получает список всех монет через API CoinGecko (endpoint markets)."""
+    """Получает список всех монет через API CoinGecko (конечная точка /coins/list)."""
     try:
         response = requests.get(url, headers=headers)
-        response.raise_for_status()  # Проверка на HTTP ошибки
-        # Документация endpoint markets:
-        # ответ содержит множество полей, но нас интересуют: id, name, symbol.
-        coins = response.json()
+        response.raise_for_status()  # выброс исключения при ошибках HTTP
+        coins = response.json()  # каждая монета имеет поля: id, symbol, name
         return coins
     except requests.exceptions.RequestException as e:
         print(f"Ошибка при запросе к CoinGecko API: {e}")
@@ -38,9 +36,9 @@ def fetch_coingecko_coins():
 def save_coins_to_db(coins):
     """Сохраняет список монет в таблицу coin_gesco_coins.
        Если таблица не существует — создаёт её.
-       Не очищает таблицу, а добавляет только новые записи.
+       Не очищает данные, а добавляет только новые записи.
     """
-    # Получаем параметры подключения к БД
+    # Параметры подключения к БД
     db_config = {
         'host': os.getenv("MYSQL_HOST", "localhost"),
         'user': os.getenv("MYSQL_USER", "root"),
@@ -62,7 +60,7 @@ def save_coins_to_db(coins):
         """
         cursor.execute(create_table_query)
 
-        # Вставляем данные. Используем INSERT IGNORE чтобы не вставлять дубли.
+        # Запрос для вставки; INSERT IGNORE предотвращает ошибку дублирования
         insert_query = """
             INSERT IGNORE INTO coin_gesco_coins (id, name, symbol)
             VALUES (%s, %s, %s);
