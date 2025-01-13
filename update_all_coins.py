@@ -170,7 +170,7 @@ def update_coin_in_db(coin):
         cursor = conn.cursor()
         cursor.execute(update_query, values)
         conn.commit()
-        print(f"Запись для монеты {coin_id} обновлена.")
+        print(f"Запись для монеты {coin_id} обновлена. (Передано: {len(ids_batch)}; Получено: {1})")
     except mysql.connector.Error as e:
         print(f"Ошибка обновления монеты {coin_id}: {e}")
     finally:
@@ -185,11 +185,12 @@ def main():
 
     updated_count = 0
     total_batches = 0
-    # Разбиваем список id на батчи по BATCH_SIZE
+    # Разбиваем список на батчи по BATCH_SIZE
     for batch in batch_list(coin_ids, BATCH_SIZE):
         total_batches += 1
         print(f"\nОбработка батча {total_batches} (монет: {len(batch)})...")
         coins_data = fetch_market_data_for_ids(batch)
+        print(f"Передано монет: {len(batch)}; Получено данных: {len(coins_data)}")
         if not coins_data:
             print("Нет данных для данного батча.")
             continue
