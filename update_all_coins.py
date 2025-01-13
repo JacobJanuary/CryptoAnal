@@ -5,7 +5,7 @@ import time
 from dotenv import load_dotenv
 from datetime import datetime
 
-# Загружаем переменные окружения из файла .env
+# Загружаем переменные окружения
 load_dotenv()
 
 # Параметры подключения к базе данных
@@ -22,8 +22,7 @@ COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY", "")
 # Параметры API
 MARKETS_URL = "https://api.coingecko.com/api/v3/coins/markets"
 VS_CURRENCY = "usd"
-# Максимальное количество id за один запрос; обычно можно передать до 250, можно настроить по необходимости
-BATCH_SIZE = 250
+BATCH_SIZE = 250  # Максимальное количество id за один запрос
 
 
 def get_all_coin_ids():
@@ -170,7 +169,7 @@ def update_coin_in_db(coin):
         cursor = conn.cursor()
         cursor.execute(update_query, values)
         conn.commit()
-        print(f"Запись для монеты {coin_id} обновлена. (Передано: {len(ids_batch)}; Получено: {1})")
+        print(f"Запись для монеты {coin_id} обновлена.")
     except mysql.connector.Error as e:
         print(f"Ошибка обновления монеты {coin_id}: {e}")
     finally:
@@ -185,12 +184,13 @@ def main():
 
     updated_count = 0
     total_batches = 0
-    # Разбиваем список на батчи по BATCH_SIZE
+
+    # Разбиваем список id на батчи по BATCH_SIZE
     for batch in batch_list(coin_ids, BATCH_SIZE):
         total_batches += 1
-        print(f"\nОбработка батча {total_batches} (монет: {len(batch)})...")
+        print(f"\nОбработка батча {total_batches} (передано монет: {len(batch)})...")
         coins_data = fetch_market_data_for_ids(batch)
-        print(f"Передано монет: {len(batch)}; Получено данных: {len(coins_data)}")
+        print(f"Получено данных: {len(coins_data)}")
         if not coins_data:
             print("Нет данных для данного батча.")
             continue
