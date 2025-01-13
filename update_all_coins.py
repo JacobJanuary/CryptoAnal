@@ -20,7 +20,7 @@ db_config = {
 COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY", "")
 
 # Параметры API
-MARKETS_URL = "https://api.coingecko.com/api/v3/coins/markets"
+MARKETS_URL = "https://pro-api.coingecko.com/api/v3/coins/markets"
 VS_CURRENCY = "usd"
 BATCH_SIZE = 100  # обрабатываем по 100 монет за один запрос
 
@@ -66,7 +66,7 @@ def fetch_market_data_for_ids(ids_batch):
     }
     headers = {
         "accept": "application/json",
-        "x-cg-demo-api-key": COINGECKO_API_KEY
+        "x-cg-pro-api-key": COINGECKO_API_KEY
     }
     try:
         response = requests.get(MARKETS_URL, params=params, headers=headers)

@@ -12,11 +12,11 @@ if not COINGECKO_API_KEY:
     raise ValueError("Необходимо установить переменную окружения COINGECKO_API_KEY")
 
 # URL для получения списка категорий монет
-url = "https://api.coingecko.com/api/v3/coins/categories/list"
+url = "https://pro-api.coingecko.com/api/v3/coins/categories/list"
 
 headers = {
     "accept": "application/json",
-    "x-cg-demo-api-key": COINGECKO_API_KEY
+    "x-cg-pro-api-key": COINGECKO_API_KEY
 }
 
 def fetch_categories():

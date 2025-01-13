@@ -25,10 +25,10 @@ def fetch_coin_details(coin_id):
     """
     Запрашивает данные монеты по coin_id через API CoinGecko и возвращает JSON-словарь.
     """
-    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}"
+    url = f"https://pro-api.coingecko.com/api/v3/coins/{coin_id}"
     headers = {
         "accept": "application/json",
-        "x-cg-demo-api-key": COINGECKO_API_KEY
+        "x-cg-pro-api-key": COINGECKO_API_KEY
     }
     params = {
         "localization": "false",
@@ -321,7 +321,7 @@ def main():
         else:
             print(f"Не удалось получить данные для монеты {coin_id}.")
         # Задержка в 2 секунды для соблюдения лимита 30 запросов в минуту
-        time.sleep(2)
+        #time.sleep(2)
 
 
 if __name__ == "__main__":
