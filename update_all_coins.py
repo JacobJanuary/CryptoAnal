@@ -251,7 +251,7 @@ def main():
                         zero_count += 1
         print(f"Батч {total_batches}: обновлено {batch_updated_count} монет.")
         overall_updated_count += batch_updated_count
-        time.sleep(2)  # задержка для соблюдения лимита API
+        #time.sleep(2)  # задержка для соблюдения лимита API
 
     print(f"\nОбновлено записей всего: {overall_updated_count} из {total_ids}")
     print(f"Количество монет с нулевым объемом или ценой: {zero_count}")
