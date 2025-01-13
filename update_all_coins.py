@@ -22,7 +22,7 @@ COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY", "")
 # Параметры API
 MARKETS_URL = "https://api.coingecko.com/api/v3/coins/markets"
 VS_CURRENCY = "usd"
-BATCH_SIZE = 250  # Максимальное количество id за один запрос
+BATCH_SIZE = 100  # теперь обрабатываем по 100 монет за один запрос
 
 
 def get_all_coin_ids():
@@ -104,11 +104,11 @@ def update_coin_in_db(coin):
       - atl_usd
       - atl_change_percentage_usd
       - atl_date_usd
-      - lastupdate (текущее время)
+      - lastupdate (устанавливается через NOW())
     """
     coin_id = coin.get("id")
     if not coin_id:
-        return
+        return False
 
     current_price = coin.get("current_price")
     market_cap_rank = coin.get("market_cap_rank")
@@ -169,9 +169,10 @@ def update_coin_in_db(coin):
         cursor = conn.cursor()
         cursor.execute(update_query, values)
         conn.commit()
-        print(f"Запись для монеты {coin_id} обновлена.")
+        return True
     except mysql.connector.Error as e:
         print(f"Ошибка обновления монеты {coin_id}: {e}")
+        return False
     finally:
         if 'conn' in locals() and conn.is_connected():
             cursor.close()
@@ -180,9 +181,10 @@ def update_coin_in_db(coin):
 
 def main():
     coin_ids = get_all_coin_ids()
-    print(f"Найдено {len(coin_ids)} монет в таблице coin_gesco_coins.")
+    total_ids = len(coin_ids)
+    print(f"Найдено {total_ids} монет в таблице coin_gesco_coins.")
 
-    updated_count = 0
+    overall_updated_count = 0
     total_batches = 0
 
     # Разбиваем список id на батчи по BATCH_SIZE
@@ -190,17 +192,18 @@ def main():
         total_batches += 1
         print(f"\nОбработка батча {total_batches} (передано монет: {len(batch)})...")
         coins_data = fetch_market_data_for_ids(batch)
-        print(f"Получено данных: {len(coins_data)}")
-        if not coins_data:
-            print("Нет данных для данного батча.")
-            continue
-        for coin in coins_data:
-            update_coin_in_db(coin)
-            updated_count += 1
-        # Задержка в 2 секунды для соблюдения лимита 30 запросов в минуту
-        time.sleep(2)
+        received_count = len(coins_data)
+        print(f"Получено данных: {received_count}")
+        batch_updated_count = 0
+        if coins_data:
+            for coin in coins_data:
+                if update_coin_in_db(coin):
+                    batch_updated_count += 1
+        print(f"Батч {total_batches}: обновлено {batch_updated_count} монет.")
+        overall_updated_count += batch_updated_count
+        time.sleep(2)  # задержка для соблюдения лимита API
 
-    print(f"\nОбновлено записей: {updated_count}")
+    print(f"\nОбновлено записей всего: {overall_updated_count} из {total_ids}")
 
 
 if __name__ == "__main__":
