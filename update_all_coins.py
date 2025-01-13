@@ -89,7 +89,7 @@ def parse_datetime(dt_str):
 def update_coin_in_db(coin):
     """
     Обновляет запись монеты в таблице coin_gesco_coins по её id.
-    Обновляются поля:
+    Обновляются следующие поля:
       - current_price_usd
       - market_cap_rank
       - market_cap_usd
@@ -184,9 +184,11 @@ def insert_volume_history(coin):
     """
     Вставляет в таблицу coin_volume_history запись с:
       - coin_id (идентификатор монеты)
-      - volume (из total_volume)
-      - price (из current_price)
+      - volume = total_volume
+      - price = current_price
       - history_date_time = NOW()
+    Если для монеты не передаются данные по объемам или цене (нулевые значения),
+    запись не вставляется и выводится сообщение.
     Возвращает True, если вставка успешна, иначе False.
     """
     coin_id = coin.get("id")
@@ -194,6 +196,12 @@ def insert_volume_history(coin):
         return False
     volume = coin.get("total_volume")
     price = coin.get("current_price")
+
+    # Если цена или объем равны нулю или отсутствуют, не вставляем запись
+    if not volume or volume == 0 or not price or price == 0:
+        print(f"Для монеты {coin_id} объем составил {volume}, цена: {price}")
+        return False
+
     insert_query = """
          INSERT INTO coin_volume_history (coin_id, volume, price, history_date_time)
          VALUES (%s, %s, %s, NOW())
@@ -221,6 +229,7 @@ def main():
 
     overall_updated_count = 0
     total_batches = 0
+    zero_count = 0  # счетчик монет с нулевым объемом или ценой
 
     # Разбиваем список id на батчи по BATCH_SIZE (100)
     for batch in batch_list(coin_ids, BATCH_SIZE):
@@ -234,14 +243,18 @@ def main():
             for coin in coins_data:
                 if update_coin_in_db(coin):
                     batch_updated_count += 1
-                    # Добавляем запись в таблицу coin_volume_history
+                    # Добавляем запись в coin_volume_history только если объем и цена ненулевые
                     if insert_volume_history(coin):
-                        pass  # Можем при желании добавить дополнительный вывод для успешной вставки
+                        pass
+                    else:
+                        # Если запись не вставлена, то увеличиваем счетчик монет с нулевыми данными
+                        zero_count += 1
         print(f"Батч {total_batches}: обновлено {batch_updated_count} монет.")
         overall_updated_count += batch_updated_count
-        time.sleep(2)  # задержка в 2 секунды для соблюдения лимита API
+        time.sleep(2)  # задержка для соблюдения лимита API
 
     print(f"\nОбновлено записей всего: {overall_updated_count} из {total_ids}")
+    print(f"Количество монет с нулевым объемом или ценой: {zero_count}")
 
 
 if __name__ == "__main__":
