@@ -22,7 +22,7 @@ COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY", "")
 # Параметры API
 MARKETS_URL = "https://api.coingecko.com/api/v3/coins/markets"
 VS_CURRENCY = "usd"
-BATCH_SIZE = 100  # теперь обрабатываем по 100 монет за один запрос
+BATCH_SIZE = 100  # по 100 монет за запрос
 
 
 def get_all_coin_ids():
@@ -104,7 +104,8 @@ def update_coin_in_db(coin):
       - atl_usd
       - atl_change_percentage_usd
       - atl_date_usd
-      - lastupdate (устанавливается через NOW())
+      - lastupdate (NOW())
+    Возвращает True, если обновление успешно, иначе False.
     """
     coin_id = coin.get("id")
     if not coin_id:
@@ -179,6 +180,39 @@ def update_coin_in_db(coin):
             conn.close()
 
 
+def insert_volume_history(coin):
+    """
+    Вставляет в таблицу coin_volume_history запись с:
+      - coin_id
+      - volume (из total_volume)
+      - price (из current_price)
+      - history_date_time = NOW()
+    """
+    coin_id = coin.get("id")
+    if not coin_id:
+        return False
+    volume = coin.get("total_volume")
+    price = coin.get("current_price")
+    insert_query = """
+         INSERT INTO coin_volume_history (coin_id, volume, price, history_date_time)
+         VALUES (%s, %s, %s, NOW())
+    """
+    values = (coin_id, volume, price)
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor()
+        cursor.execute(insert_query, values)
+        conn.commit()
+        return True
+    except mysql.connector.Error as e:
+        print(f"Ошибка вставки в coin_volume_history для монеты {coin_id}: {e}")
+        return False
+    finally:
+        if 'conn' in locals() and conn.is_connected():
+            cursor.close()
+            conn.close()
+
+
 def main():
     coin_ids = get_all_coin_ids()
     total_ids = len(coin_ids)
@@ -187,7 +221,7 @@ def main():
     overall_updated_count = 0
     total_batches = 0
 
-    # Разбиваем список id на батчи по BATCH_SIZE
+    # Разбиваем список id на батчи по BATCH_SIZE (100)
     for batch in batch_list(coin_ids, BATCH_SIZE):
         total_batches += 1
         print(f"\nОбработка батча {total_batches} (передано монет: {len(batch)})...")
@@ -199,9 +233,12 @@ def main():
             for coin in coins_data:
                 if update_coin_in_db(coin):
                     batch_updated_count += 1
+                    # Вставляем запись в coin_volume_history для этой монеты
+                    if insert_volume_history(coin):
+                        pass  # Можно добавить дополнительный вывод, если нужно
         print(f"Батч {total_batches}: обновлено {batch_updated_count} монет.")
         overall_updated_count += batch_updated_count
-        time.sleep(2)  # задержка для соблюдения лимита API
+        time.sleep(2)  # задержка 2 секунды для соблюдения лимита API
 
     print(f"\nОбновлено записей всего: {overall_updated_count} из {total_ids}")
 
