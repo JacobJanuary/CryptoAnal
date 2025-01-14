@@ -64,5 +64,16 @@
     {% else %}
     <p>Нет данных для отображения.</p>
     {% endif %}
+    <div id="modal" class="modal">
+    <div class="modal-content">
+        <h3 id="modal-title"></h3>
+        <div id="modal-loading">
+            <div class="loader"></div>
+            <p>ИИ анализирует информацию. Подождите...</p>
+        </div>
+        <div id="modal-content-data" style="display: none;"></div>
+        <button id="close-modal">Закрыть</button>
+    </div>
+</div>
 </body>
 </html>
