@@ -20,6 +20,9 @@
                     <th data-type="percent" onclick="sortTable(4, 'percent')">Vol Growth (1ч)</th>
                     <th data-type="percent" onclick="sortTable(5, 'percent')">Price Change (6ч)</th>
                     <th data-type="number" onclick="sortTable(6, 'number')">Current Price</th>
+                    <th>Coingecko</th>
+                    <th>AI Аналитика</th>
+                    <th>Избранное</th>
                 </tr>
             </thead>
             <tbody>
@@ -32,6 +35,26 @@
                     <td>{{ crypto.vol_growth_1h|round(2) }}%</td>
                     <td>{{ crypto.price_change_6h|round(2) }}%</td>
                     <td>{{ crypto.current_price }}</td>
+                    <td>
+                        <a href="https://www.coingecko.com/en/coins/{{ crypto.coin_id }}" target="_blank">
+                            Ссылка
+                        </a>
+                    </td>
+                    <td>
+                        <button onclick="showAIAnalytics('{{ crypto.name }}', '{{ crypto.symbol }}')" class="ai-analytics">
+                            AI Аналитика
+                        </button>
+                    </td>
+                    <td>
+                        <button id="favorite-button-{{ crypto.coin_id }}"
+                                onclick="toggleFavorite('{{ crypto.coin_id }}', {{ 'true' if crypto.isFavourites else 'false' }})">
+                            {% if crypto.isFavourites %}
+                                Удалить
+                            {% else %}
+                                Добавить
+                            {% endif %}
+                        </button>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
