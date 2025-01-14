@@ -21,7 +21,7 @@ def index():
         cur = mysql.connection.cursor()
         # Вызываем функцию cg_GetFilteredCoins с параметрами по умолчанию:
         # p_vol_min: 10000, p_growth6h: 100, p_growth1h: 100, p_price_change_max: 10, p_price_change_min: 0, p_market_cap_rank: NULL
-        query = "SELECT * FROM cg_GetFilteredCoins(10000, 100, 100, 10, 0, NULL)"
+        query = "CALL cg_GetFilteredCoins(10000, 100, 100, 10, 0, NULL)"
         cur.execute(query)
         rows = cur.fetchall()
         col_names = [desc[0] for desc in cur.description]
