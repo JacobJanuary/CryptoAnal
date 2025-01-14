@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Фильтрованные криптовалюты (CoinGecko)</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='main.js') }}"></script>
+</head>
+<body>
+<h1>Фильтрованные криптовалюты (CoinGecko)</h1>
+{% if crypto_data %}
+<div id="table-container">
+    <table id="cryptoTable">
+        <thead>
+            <tr>
+                <th>Coin ID</th>
+                <th>Market Cap Rank</th>
+                <th>Name</th>
+                <th>Symbol</th>
+                <th>Current Volume</th>
+                <th>Vol Growth (6ч)</th>
+                <th>Vol Growth (1ч)</th>
+                <th>Price Change (6ч)</th>
+                <th>Current Price</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for crypto in crypto_data %}
+            <tr>
+                <td>{{ crypto.coin_id }}</td>
+                <td>{{ crypto.market_cap_rank }}</td>
+                <td>{{ crypto.name }}</td>
+                <td>{{ crypto.symbol }}</td>
+                <td>{{ crypto.vol_latest }}</td>
+                <td>{{ crypto.vol_growth_6h|round(2) }}%</td>
+                <td>{{ crypto.vol_growth_1h|round(2) }}%</td>
+                <td>{{ crypto.price_change_6h|round(2) }}%</td>
+                <td>{{ crypto.current_price }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+<p>Всего криптовалют: {{ crypto_data|length }}</p>
+{% else %}
+<p>Нет данных для отображения.</p>
+{% endif %}
+</body>
+</html>
