@@ -152,49 +152,71 @@ function sortTable(columnIndex, type) {
     const table = document.getElementById('cryptoTable');
     const tbody = table.tBodies[0];
     const rows = Array.from(tbody.rows);
-
-    // Считываем текущие значения сортировки
+    const currentColumn = table.dataset.sortColumn;
     let currentDirection = table.dataset.sortDirection || 'asc';
-    let currentColumn = table.dataset.sortColumn || '-1';
 
-    // Если нажали на тот же столбец, меняем направление
+    // Определяем направление сортировки
     if (currentColumn === columnIndex.toString()) {
         currentDirection = currentDirection === 'asc' ? 'desc' : 'asc';
     } else {
-        // Если переключились на другой столбец, начинаем с "asc"
         currentDirection = 'asc';
     }
+
+    // Устанавливаем data-атрибуты для текущего столбца
+    table.dataset.sortColumn = columnIndex.toString();
+    table.dataset.sortDirection = currentDirection;
+
+    // Добавляем класс sorted- к заголовку
+    const headers = table.querySelectorAll('th');
+    headers.forEach((header, index) => {
+        header.classList.remove('sorted-asc', 'sorted-desc');
+        if (index === columnIndex) {
+            header.classList.add(currentDirection === 'asc' ? 'sorted-asc' : 'sorted-desc');
+        }
+    });
 
     // Сортируем строки
     rows.sort((a, b) => {
         let x = a.cells[columnIndex].textContent.trim();
         let y = b.cells[columnIndex].textContent.trim();
 
-        // Приведение типов данных для корректного сравнения
-        if (type === 'number') {
+        if (type === 'number' || type === 'percent') {
             x = parseFloat(x.replace(/[^0-9.-]/g, '')) || 0;
             y = parseFloat(y.replace(/[^0-9.-]/g, '')) || 0;
-        } else if (type === 'percent') {
-            x = parseFloat(x.replace('%', '')) || 0;
-            y = parseFloat(y.replace('%', '')) || 0;
         } else {
             x = x.toLowerCase();
             y = y.toLowerCase();
         }
 
-        // Сравнение в зависимости от направления
-        if (x === y) return 0;
-        return (currentDirection === 'asc' ? (x > y ? 1 : -1) : (x > y ? -1 : 1)); // Исправленная строка
+        if (currentDirection === 'asc') {
+            return x > y ? 1 : (x < y ? -1 : 0);
+        } else {
+            return x < y ? 1 : (x > y ? -1 : 0);
+        }
     });
 
     // Перестраиваем таблицу
     tbody.innerHTML = '';
     rows.forEach(row => tbody.appendChild(row));
-
-    // Сохраняем текущее направление и колонку в data-атрибутах таблицы
-    table.dataset.sortDirection = currentDirection;
-    table.dataset.sortColumn = columnIndex.toString();
 }
+
+window.onload = function() {
+    console.log("main.js загружен");
+    // Обработчик для закрытия модального окна AI аналитики
+    document.getElementById('close-modal').addEventListener('click', closeModal);
+    // Обработчики для модального окна фильтров
+    document.getElementById('open-filters-btn').addEventListener('click', openFiltersModal);
+    document.getElementById('close-filters-btn').addEventListener('click', closeFiltersModal);
+    document.getElementById('save-filters-btn').addEventListener('click', saveFilters);
+
+    // Обработчик для сортировки таблицы вынесен за пределы цикла
+    document.querySelectorAll('#cryptoTable th[data-type]').forEach((header, index) => {
+        header.addEventListener('click', () => {
+            const type = header.getAttribute('data-type');
+            sortTable(index, type);
+        });
+    });
+};
 
 // Функция для переключения избранного
 function toggleFavorite(coinId, currentVal) {
