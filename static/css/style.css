@@ -122,6 +122,7 @@ button {
 button:hover {
     background-color: #0056b3;
 }
+
 .sector-ai {
     background-color: #c8e6c9; /* светло-зеленый — для AI */
     color: #333; /* темный текст для контраста */
@@ -135,4 +136,54 @@ button:hover {
 .sector-real {
     background-color: silver; /* серебристый фон */
     color: #000;
+}
+
+/* Стили для модального окна настроек фильтров */
+#filter-modal {
+    display: none;
+    position: fixed;
+    top: 50%;
+    right: 10%;
+    transform: translateY(-50%);
+    background-color: white;
+    border: 1px solid #ccc;
+    padding: 20px;
+    z-index: 2000;
+    width: 300px;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+#filter-modal h3 {
+    margin-top: 0;
+}
+
+#filter-modal label {
+    display: block;
+    margin-top: 10px;
+}
+
+#filter-modal input {
+    width: 100%;
+    padding: 5px;
+    margin-top: 5px;
+}
+
+#filter-modal button {
+    margin-top: 15px;
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+/* Кнопка Customise */
+#open-filters-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    z-index: 2100;
 }

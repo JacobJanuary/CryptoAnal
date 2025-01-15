@@ -7,26 +7,29 @@
     <script src="{{ url_for('static', filename='main.js') }}"></script>
 </head>
 <body>
-    <h1>Фильтрованные криптовалюты (CoinGecko)</h1>
-    {% if crypto_data %}
+<!-- Кнопка для открытия модального окна настроек фильтров -->
+<button id="open-filters-btn">Customise</button>
+
+<h1>Фильтрованные криптовалюты (CoinGecko)</h1>
+{% if crypto_data %}
     <div id="table-container">
         <table id="cryptoTable">
             <thead>
-                <tr>
-                    <th data-type="string" onclick="sortTable(0, 'string')">Name (Symbol)</th>
-                    <th data-type="number" onclick="sortTable(1, 'number')">Rank</th>
-                    <th data-type="number" onclick="sortTable(2, 'number')">Current Volume</th>
-                    <th data-type="percent" onclick="sortTable(3, 'percent')">Vol Growth (6ч)</th>
-                    <th data-type="percent" onclick="sortTable(4, 'percent')">Vol Growth (1ч)</th>
-                    <th data-type="percent" onclick="sortTable(5, 'percent')">Price Change (6ч)</th>
-                    <th data-type="number" onclick="sortTable(6, 'number')">Current Price</th>
-                    <th>Coingecko</th>
-                    <th>AI Аналитика</th>
-                    <th>Избранное</th>
-                </tr>
+            <tr>
+                <th data-type="string" onclick="sortTable(0, 'string')">Name (Symbol)</th>
+                <th data-type="number" onclick="sortTable(1, 'number')">Rank</th>
+                <th data-type="number" onclick="sortTable(2, 'number')">Current Volume</th>
+                <th data-type="percent" onclick="sortTable(3, 'percent')">Vol Growth (6ч)</th>
+                <th data-type="percent" onclick="sortTable(4, 'percent')">Vol Growth (1ч)</th>
+                <th data-type="percent" onclick="sortTable(5, 'percent')">Price Change (6ч)</th>
+                <th data-type="number" onclick="sortTable(6, 'number')">Current Price</th>
+                <th>Coingecko</th>
+                <th>AI Аналитика</th>
+                <th>Избранное</th>
+            </tr>
             </thead>
             <tbody>
-                {% for crypto in crypto_data %}
+            {% for crypto in crypto_data %}
                 <tr>
                     <td>{{ crypto.name }} ({{ crypto.symbol }})</td>
                     <td>{{ crypto.market_cap_rank }}</td>
@@ -41,7 +44,8 @@
                         </a>
                     </td>
                     <td>
-                        <button onclick="showAIAnalytics('{{ crypto.name }}', '{{ crypto.symbol }}')" class="ai-analytics">
+                        <button onclick="showAIAnalytics('{{ crypto.name }}', '{{ crypto.symbol }}')"
+                                class="ai-analytics">
                             AI Аналитика
                         </button>
                     </td>
@@ -56,15 +60,16 @@
                         </button>
                     </td>
                 </tr>
-                {% endfor %}
+            {% endfor %}
             </tbody>
         </table>
     </div>
     <p>Всего криптовалют: {{ crypto_data|length }}</p>
-    {% else %}
+{% else %}
     <p>Нет данных для отображения.</p>
-    {% endif %}
-    <div id="modal" class="modal">
+{% endif %}
+
+<div id="modal" class="modal">
     <div class="modal-content">
         <h3 id="modal-title"></h3>
         <div id="modal-loading">
@@ -74,6 +79,31 @@
         <div id="modal-content-data" style="display: none;"></div>
         <button id="close-modal">Закрыть</button>
     </div>
-    </div>
+</div>
+
+<!-- Модальное окно для фильтров -->
+<div id="filter-modal">
+    <h3>Настройки фильтров</h3>
+    <label for="vol-min">Минимальный текущий объем (vol_latest):</label>
+    <input type="number" id="vol-min" placeholder="Например, 10000">
+
+    <label for="growth6h">Минимальный прирост объема за 6 ч (%):</label>
+    <input type="number" id="growth6h" placeholder="Например, 100">
+
+    <label for="growth1h">Минимальный прирост объема за 1 ч (%):</label>
+    <input type="number" id="growth1h" placeholder="Например, 100">
+
+    <label for="price-change-max">Макс. изменение цены за 6 ч (%):</label>
+    <input type="number" id="price-change-max" placeholder="Например, 10">
+
+    <label for="price-change-min">Мин. изменение цены за 6 ч (%):</label>
+    <input type="number" id="price-change-min" placeholder="Например, 0">
+
+    <label for="market-cap-rank">Максимальный Market Cap Rank:</label>
+    <input type="number" id="market-cap-rank" placeholder="Например, 1000">
+
+    <button id="save-filters-btn">Сохранить</button>
+    <button id="close-filters-btn">Закрыть</button>
+</div>
 </body>
 </html>

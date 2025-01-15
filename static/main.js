@@ -28,30 +28,30 @@ function showAIAnalytics(name, symbol) {
         },
         body: `name=${encodeURIComponent(name)}&symbol=${encodeURIComponent(symbol)}`
     })
-    .then(response => {
-        if (!response.ok) {
-            return response.text().then(err => {
-                console.error('Ошибка на сервере:', err);
-                throw new Error(`Ошибка сервера: ${response.status}`);
-            });
-        }
-        return response.json();
-    })
-    .then(data => {
-        if (data.error) {
-            alert(`Ошибка: ${data.error}`);
+        .then(response => {
+            if (!response.ok) {
+                return response.text().then(err => {
+                    console.error('Ошибка на сервере:', err);
+                    throw new Error(`Ошибка сервера: ${response.status}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                alert(`Ошибка: ${data.error}`);
+                modal.style.display = 'none';
+            } else {
+                modalLoading.style.display = 'none';
+                modalContent.style.display = 'block';
+                modalContent.innerHTML = formatAnalyticsContent(data.content); // Используем форматирование
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка fetch:', error);
+            alert(`Произошла ошибка: ${error.message}`);
             modal.style.display = 'none';
-        } else {
-            modalLoading.style.display = 'none';
-            modalContent.style.display = 'block';
-            modalContent.innerHTML = formatAnalyticsContent(data.content); // Используем форматирование
-        }
-    })
-    .catch(error => {
-        console.error('Ошибка fetch:', error);
-        alert(`Произошла ошибка: ${error.message}`);
-        modal.style.display = 'none';
-    });
+        });
 }
 
 
@@ -105,37 +105,37 @@ function toggleFavorite(coinId, currentVal) {
             isFavourites: newVal
         })
     })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`Ошибка сервера: ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        if (data.error) {
-            alert(`Ошибка: ${data.error}`);
-            return;
-        }
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Ошибка сервера: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                alert(`Ошибка: ${data.error}`);
+                return;
+            }
 
-        // Если успех, меняем текст кнопки
-        const button = document.getElementById(`favorite-button-${coinId}`);
-        if (newVal) {
-            button.textContent = 'Удалить';
-        } else {
-            button.textContent = 'Добавить';
-        }
+            // Если успех, меняем текст кнопки
+            const button = document.getElementById(`favorite-button-${coinId}`);
+            if (newVal) {
+                button.textContent = 'Удалить';
+            } else {
+                button.textContent = 'Добавить';
+            }
 
-        // Также нужно обновить сам onclick, чтобы при следующем нажатии правильно передавалось новое текущее значение
-        button.setAttribute('onclick', `toggleFavorite('${coinId}', ${newVal})`);
-    })
-    .catch(error => {
-        console.error('Ошибка при toggleFavorite:', error);
-        alert(`Произошла ошибка: ${error.message}`);
-    });
+            // Также нужно обновить сам onclick, чтобы при следующем нажатии правильно передавалось новое текущее значение
+            button.setAttribute('onclick', `toggleFavorite('${coinId}', ${newVal})`);
+        })
+        .catch(error => {
+            console.error('Ошибка при toggleFavorite:', error);
+            alert(`Произошла ошибка: ${error.message}`);
+        });
 }
 
 // Event listeners for modal buttons and sorting
-window.onload = function() {
+window.onload = function () {
     document.getElementById('close-modal').addEventListener('click', closeModal);
 
     document.querySelectorAll('#cryptoTable th[data-type]').forEach((header, index) => {
