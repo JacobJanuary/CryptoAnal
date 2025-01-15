@@ -5,51 +5,8 @@
     <title>Фильтрованные криптовалюты (CoinGecko)</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="{{ url_for('static', filename='main.js') }}"></script>
-    <style>
-        /* Дополнительные стили для модального окна фильтров */
-        #filter-modal {
-            display: none;
-            position: fixed;
-            top: 50%;
-            right: 10%;
-            transform: translateY(-50%);
-            background-color: white;
-            border: 1px solid #ccc;
-            padding: 20px;
-            z-index: 2000;
-            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
-        }
-        #filter-modal label {
-            display: block;
-            margin-top: 10px;
-        }
-        #filter-modal input {
-            width: 100%;
-            padding: 5px;
-            margin-top: 5px;
-        }
-        #filter-modal button {
-            margin-top: 20px;
-        }
-        /* Кнопка для открытия окна фильтров */
-        #open-filters-btn {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 4px;
-            cursor: pointer;
-            z-index: 2100;
-        }
-    </style>
 </head>
 <body>
-    <!-- Кнопка для открытия модального окна фильтров -->
-    <button id="open-filters-btn">Customise</button>
-
     <h1>Фильтрованные криптовалюты (CoinGecko)</h1>
     {% if crypto_data %}
     <div id="table-container">
@@ -79,7 +36,9 @@
                     <td>{{ crypto.price_change_6h|round(2) }}%</td>
                     <td>{{ crypto.current_price }}</td>
                     <td>
-                        <a href="https://www.coingecko.com/en/coins/{{ crypto.coin_id }}" target="_blank">Ссылка</a>
+                        <a href="https://www.coingecko.com/en/coins/{{ crypto.coin_id }}" target="_blank">
+                            Ссылка
+                        </a>
                     </td>
                     <td>
                         <button onclick="showAIAnalytics('{{ crypto.name }}', '{{ crypto.symbol }}')" class="ai-analytics">
@@ -87,7 +46,8 @@
                         </button>
                     </td>
                     <td>
-                        <button id="favorite-button-{{ crypto.coin_id }}" onclick="toggleFavorite('{{ crypto.coin_id }}', {{ 'true' if crypto.isFavourites else 'false' }})">
+                        <button id="favorite-button-{{ crypto.coin_id }}"
+                                onclick="toggleFavorite('{{ crypto.coin_id }}', {{ 'true' if crypto.isFavourites else 'false' }})">
                             {% if crypto.isFavourites %}
                                 Удалить
                             {% else %}
@@ -104,43 +64,5 @@
     {% else %}
     <p>Нет данных для отображения.</p>
     {% endif %}
-
-    <!-- Модальное окно для AI аналитики -->
-    <div id="modal" class="modal">
-        <div class="modal-content">
-            <h3 id="modal-title"></h3>
-            <div id="modal-loading">
-                <div class="loader"></div>
-                <p>ИИ анализирует информацию. Подождите...</p>
-            </div>
-            <div id="modal-content-data" style="display: none;"></div>
-            <button id="close-modal">Закрыть</button>
-        </div>
-    </div>
-
-    <!-- Модальное окно для фильтров -->
-    <div id="filter-modal">
-        <h3>Настройки фильтров</h3>
-        <label for="vol-min">Минимальный текущий объем (vol_latest):</label>
-        <input type="number" id="vol-min" placeholder="Например, 10000">
-
-        <label for="growth6h">Минимальный прирост объема за 6 ч (%):</label>
-        <input type="number" id="growth6h" placeholder="Например, 100">
-
-        <label for="growth1h">Минимальный прирост объема за 1 ч (%):</label>
-        <input type="number" id="growth1h" placeholder="Например, 100">
-
-        <label for="price-change-max">Макс. изменение цены за 6 ч (%):</label>
-        <input type="number" id="price-change-max" placeholder="Например, 10">
-
-        <label for="price-change-min">Мин. изменение цены за 6 ч (%):</label>
-        <input type="number" id="price-change-min" placeholder="Например, 0">
-
-        <label for="market-cap-rank">Максимальный Market Cap Rank:</label>
-        <input type="number" id="market-cap-rank" placeholder="Например, 1000">
-
-        <button id="save-filters-btn">Сохранить</button>
-        <button id="close-filters-btn">Закрыть</button>
-    </div>
 </body>
 </html>
