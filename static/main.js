@@ -153,35 +153,38 @@ function sortTable(columnIndex, type) {
     const tbody = table.tBodies[0];
     const rows = Array.from(tbody.rows);
 
-    // Получаем текущее направление сортировки, если оно не задано – по умолчанию "asc"
-    let direction = table.dataset.sortDirection || 'asc';
-    // Переключаем направление
-    direction = (direction === 'asc') ? 'desc' : 'asc';
+    // Получаем текущее направление сортировки для данного столбца
+    const currentDirection = table.dataset[`sortDirection${columnIndex}`] || 'asc';
+    const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
 
+    // Сортируем строки
     rows.sort((a, b) => {
         let x = a.cells[columnIndex].textContent.trim();
         let y = b.cells[columnIndex].textContent.trim();
 
-        // Приведение к нужному типу
+        // Приведение типов для сортировки
         if (type === 'number') {
-            x = parseFloat(x) || 0;
-            y = parseFloat(y) || 0;
+            x = parseFloat(x.replace(/[^0-9.-]/g, '')) || 0;
+            y = parseFloat(y.replace(/[^0-9.-]/g, '')) || 0;
         } else if (type === 'percent') {
-            x = parseFloat(x.replace('%','')) || 0;
-            y = parseFloat(y.replace('%','')) || 0;
+            x = parseFloat(x.replace('%', '')) || 0;
+            y = parseFloat(y.replace('%', '')) || 0;
         } else {
             x = x.toLowerCase();
             y = y.toLowerCase();
         }
 
         if (x === y) return 0;
-
-        if (direction === 'asc') {
-            return (x > y) ? 1 : -1;
-        } else {
-            return (x < y) ? 1 : -1;
-        }
+        return (newDirection === 'asc' ? (x > y ? 1 : -1) : (x < y ? 1 : -1));
     });
+
+    // Очистка текущего содержимого таблицы и вставка отсортированных строк
+    tbody.innerHTML = '';
+    rows.forEach(row => tbody.appendChild(row));
+
+    // Сохраняем новое направление сортировки для столбца
+    table.dataset[`sortDirection${columnIndex}`] = newDirection;
+}
 
     // Очистить tbody и вставить отсортированные строки
     tbody.innerHTML = "";
