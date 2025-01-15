@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="{{ url_for('static', filename='main.js') }}"></script>
     <style>
-        /* Дополнительные стили для модального окна настроек фильтров */
+        /* Дополнительные стили для модального окна фильтров */
         #filter-modal {
             display: none;
             position: fixed;
@@ -31,9 +31,9 @@
         #filter-modal button {
             margin-top: 20px;
         }
-        /* Кнопка для открытия окна настроек */
+        /* Кнопка для открытия окна фильтров */
         #open-filters-btn {
-            position: absolute;
+            position: fixed;
             top: 20px;
             right: 20px;
             background-color: #007bff;
@@ -42,11 +42,14 @@
             padding: 10px 15px;
             border-radius: 4px;
             cursor: pointer;
+            z-index: 2100;
         }
     </style>
 </head>
 <body>
+    <!-- Кнопка для открытия модального окна фильтров -->
     <button id="open-filters-btn">Customise</button>
+
     <h1>Фильтрованные криптовалюты (CoinGecko)</h1>
     {% if crypto_data %}
     <div id="table-container">
@@ -84,8 +87,7 @@
                         </button>
                     </td>
                     <td>
-                        <button id="favorite-button-{{ crypto.coin_id }}"
-                            onclick="toggleFavorite('{{ crypto.coin_id }}', {{ 'true' if crypto.isFavourites else 'false' }})">
+                        <button id="favorite-button-{{ crypto.coin_id }}" onclick="toggleFavorite('{{ crypto.coin_id }}', {{ 'true' if crypto.isFavourites else 'false' }})">
                             {% if crypto.isFavourites %}
                                 Удалить
                             {% else %}
@@ -103,7 +105,20 @@
     <p>Нет данных для отображения.</p>
     {% endif %}
 
-    <!-- Модальное окно для настройки фильтров -->
+    <!-- Модальное окно для AI аналитики -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <h3 id="modal-title"></h3>
+            <div id="modal-loading">
+                <div class="loader"></div>
+                <p>ИИ анализирует информацию. Подождите...</p>
+            </div>
+            <div id="modal-content-data" style="display: none;"></div>
+            <button id="close-modal">Закрыть</button>
+        </div>
+    </div>
+
+    <!-- Модальное окно для фильтров -->
     <div id="filter-modal">
         <h3>Настройки фильтров</h3>
         <label for="vol-min">Минимальный текущий объем (vol_latest):</label>
