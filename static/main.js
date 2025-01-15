@@ -148,30 +148,18 @@ function showAIAnalytics(name, symbol) {
     });
 }
 
-// ... (остальные функции: setCookie, getCookie, openFiltersModal, closeFiltersModal, saveFilters, closeModal, formatAnalyticsContent, showAIAnalytics - без изменений) ...
-
 function sortTable(columnIndex, type) {
     const table = document.getElementById('cryptoTable');
     const tbody = table.tBodies[0];
     const rows = Array.from(tbody.rows);
 
-    // Определяем направление сортировки
-    const currentDirection = table.dataset.sortDirection || 'asc';
+    // Получаем текущее направление сортировки из атрибута заголовка
+    const header = table.querySelectorAll('th')[columnIndex];
+    let currentDirection = header.getAttribute('data-direction') || 'asc';
     const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
 
-    // Устанавливаем data-атрибуты для текущего столбца
-    table.dataset.sortDirection = newDirection;
-    table.dataset.sortColumn = columnIndex.toString();
-
-    // Убираем классы сортировки у всех заголовков
-    const headers = table.querySelectorAll('th');
-    headers.forEach(header => {
-        header.classList.remove('sorted-asc', 'sorted-desc');
-    });
-
-    // Добавляем класс сортировки к текущему заголовку
-    const currentHeader = headers[columnIndex];
-    currentHeader.classList.add(newDirection === 'asc' ? 'sorted-asc' : 'sorted-desc');
+    // Устанавливаем атрибут data-direction на заголовке
+    header.setAttribute('data-direction', newDirection);
 
     // Сортируем строки
     rows.sort((a, b) => {
