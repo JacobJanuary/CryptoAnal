@@ -265,6 +265,7 @@ window.onload = function() {
     document.getElementById('close-filters-btn').addEventListener('click', closeFiltersModal);
     document.getElementById('save-filters-btn').addEventListener('click', saveFilters);
 
+    // Обработчик клика по заголовкам таблицы
     document.querySelectorAll('#cryptoTable th[data-type]').forEach((header, index) => {
         header.addEventListener('click', () => {
             const type = header.getAttribute('data-type');
