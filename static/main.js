@@ -184,8 +184,7 @@ function sortTable(columnIndex, type) {
 
         // Сравнение в зависимости от направления
         if (x === y) return 0;
-        return (currentDirection === 'asc' ? (x > y ? 1 : -1) : (x < y ? 1 : -1));
-
+        return (currentDirection === 'asc' ? (x > y ? 1 : -1) : (x > y ? -1 : 1)); // Исправленная строка
     });
 
     // Перестраиваем таблицу
