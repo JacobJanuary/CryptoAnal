@@ -21,7 +21,6 @@ app.config['MYSQL_DB'] = os.getenv("MYSQL_DATABASE", "crypto_db")
 
 mysql = MySQL(app)
 
-
 # Вспомогательные функции
 def format_volume(volume):
     return f"{volume / 1_000_000:.2f} млн" if volume else "N/A"
