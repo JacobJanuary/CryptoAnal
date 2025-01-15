@@ -153,15 +153,22 @@ function sortTable(columnIndex, type) {
     const tbody = table.tBodies[0];
     const rows = Array.from(tbody.rows);
 
-    // Считываем текущие значения сортировки
-    let currentDirection = table.dataset.sortDirection || 'asc';
-    let currentColumn = table.dataset.sortColumn || '-1';
+    // Если атрибуты не установлены, устанавливаем начальные значения.
+    if (!table.dataset.sortDirection) {
+        table.dataset.sortDirection = 'asc';
+    }
+    if (!table.dataset.sortColumn) {
+        table.dataset.sortColumn = '-1';
+    }
+
+    let currentColumn = table.dataset.sortColumn;
+    let currentDirection = table.dataset.sortDirection;
 
     if (currentColumn === columnIndex.toString()) {
-        // Если нажали на тот же столбец, переключаем направление
-        currentDirection = currentDirection === 'asc' ? 'desc' : 'asc';
+        // Если сортировка по тому же столбцу, переключаем направление.
+        currentDirection = (currentDirection === 'asc' ? 'desc' : 'asc');
     } else {
-        // Если переключились на другой столбец, начинаем с "asc"
+        // Если другой столбец, устанавливаем направление по возрастанию.
         currentDirection = 'asc';
     }
 
@@ -170,7 +177,7 @@ function sortTable(columnIndex, type) {
         let x = a.cells[columnIndex].textContent.trim();
         let y = b.cells[columnIndex].textContent.trim();
 
-        // Приведение типов данных для корректного сравнения
+        // Приведение к нужному типу
         if (type === 'number') {
             x = parseFloat(x.replace(/[^0-9.-]/g, '')) || 0;
             y = parseFloat(y.replace(/[^0-9.-]/g, '')) || 0;
@@ -187,12 +194,14 @@ function sortTable(columnIndex, type) {
     });
 
     // Перестраиваем таблицу
-    tbody.innerHTML = '';
+    tbody.innerHTML = "";
     rows.forEach(row => tbody.appendChild(row));
 
-    // Сохраняем текущее направление и колонку в data-атрибутах таблицы
+    // Сохраняем новое направление и индекс столбца
     table.dataset.sortDirection = currentDirection;
     table.dataset.sortColumn = columnIndex.toString();
+
+    console.log("Direction: " + table.dataset.sortDirection + ", Column: " + table.dataset.sortColumn);
 }
 
 // Функция для переключения избранного

@@ -13,7 +13,7 @@
 <h1>Фильтрованные криптовалюты (CoinGecko)</h1>
 {% if crypto_data %}
     <div id="table-container">
-        <table id="cryptoTable">
+        <table id="cryptoTable" data-sort-direction="asc" data-sort-column="-1">
             <thead>
             <tr>
                 <th data-type="string" onclick="sortTable(0, 'string')">Name (Symbol)</th>
