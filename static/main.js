@@ -1,5 +1,6 @@
 // main.js
 
+
 function formatAnalyticsContent(content) {
     if (!content) return '';
 
