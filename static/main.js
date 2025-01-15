@@ -153,8 +153,8 @@ function sortTable(columnIndex, type) {
     const tbody = table.tBodies[0];
     const rows = Array.from(tbody.rows);
 
-    // Получаем текущее направление сортировки для данного столбца
-    const currentDirection = table.dataset[`sortDirection${columnIndex}`] || 'asc';
+    // Используем data-атрибут таблицы для хранения направления сортировки
+    let currentDirection = table.getAttribute(`data-sort-direction-${columnIndex}`) || 'asc';
     const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
 
     // Сортируем строки
@@ -162,7 +162,7 @@ function sortTable(columnIndex, type) {
         let x = a.cells[columnIndex].textContent.trim();
         let y = b.cells[columnIndex].textContent.trim();
 
-        // Приведение типов для сортировки
+        // Приведение типов данных для сравнения
         if (type === 'number') {
             x = parseFloat(x.replace(/[^0-9.-]/g, '')) || 0;
             y = parseFloat(y.replace(/[^0-9.-]/g, '')) || 0;
@@ -178,14 +178,13 @@ function sortTable(columnIndex, type) {
         return (newDirection === 'asc' ? (x > y ? 1 : -1) : (x < y ? 1 : -1));
     });
 
-    // Очистка текущего содержимого таблицы и вставка отсортированных строк
+    // Перестраиваем строки таблицы
     tbody.innerHTML = '';
     rows.forEach(row => tbody.appendChild(row));
 
-    // Сохраняем новое направление сортировки для столбца
-    table.dataset[`sortDirection${columnIndex}`] = newDirection;
+    // Сохраняем новое направление сортировки для данного столбца
+    table.setAttribute(`data-sort-direction-${columnIndex}`, newDirection);
 }
-
 
 // Функция для переключения избранного
 function toggleFavorite(coinId, currentVal) {
