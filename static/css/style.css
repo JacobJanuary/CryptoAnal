@@ -187,3 +187,6 @@ button:hover {
     cursor: pointer;
     z-index: 2100;
 }
+.trend {
+    background-color: #ffe0b2 !important; /* светло-оранжевый фон */
+}
