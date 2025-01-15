@@ -1,59 +1,39 @@
-// main.js
-// Функция установки cookie
+// Функция установки cookie (на случай, если потребуется fallback, можно оставить)
 function setCookie(name, value, days) {
     const expires = days ? "; expires=" + new Date(Date.now() + days*864e5).toUTCString() : "";
     document.cookie = name + "=" + encodeURIComponent(value) + expires + "; path=/";
 }
 
-// Функция получения cookie по имени
+// Функция получения cookie по имени (если потребуется)
 function getCookie(name) {
     return document.cookie.split('; ').reduce((r, v) => {
         const parts = v.split('=');
-        return parts[0] === name ? decodeURIComponent(parts[1]) : r
+        return parts[0] === name ? decodeURIComponent(parts[1]) : r;
     }, '');
 }
 
-// Значения по умолчанию
-const defaultFilters = {
-    volMin: "10000",
-    growth6h: "100",
-    growth1h: "100",
-    priceChangeMax: "10",
-    priceChangeMin: "0",
-    marketCapRank: ""  // Если пустая строка, значит фильтр не применяется
-};
-
-// Функция загрузки фильтров из cookie и заполнения формы
-function loadFiltersFromCookie() {
-    const volMin = getCookie("volMin") || defaultFilters.volMin;
-    const growth6h = getCookie("growth6h") || defaultFilters.growth6h;
-    const growth1h = getCookie("growth1h") || defaultFilters.growth1h;
-    const priceChangeMax = getCookie("priceChangeMax") || defaultFilters.priceChangeMax;
-    const priceChangeMin = getCookie("priceChangeMin") || defaultFilters.priceChangeMin;
-    const marketCapRank = getCookie("marketCapRank") || defaultFilters.marketCapRank;
-
-    document.getElementById("vol-min").value = volMin;
-    document.getElementById("growth6h").value = growth6h;
-    document.getElementById("growth1h").value = growth1h;
-    document.getElementById("price-change-max").value = priceChangeMax;
-    document.getElementById("price-change-min").value = priceChangeMin;
-    document.getElementById("market-cap-rank").value = marketCapRank;
-}
-
-// Функция открытия модального окна для фильтров
+// Функция для открытия модального окна фильтров
 function openFiltersModal() {
     const modal = document.getElementById('filter-modal');
     modal.style.display = 'block';
-    loadFiltersFromCookie(); // Предзаполнить поля значениями из cookies
+    // Загрузить значения из cookies (если применимо) или можно сделать AJAX-запрос к серверу для получения сохранённых настроек
+    // Для примера будем использовать значения по умолчанию, если cookies не заданы:
+    document.getElementById("vol-min").value = getCookie("volMin") || "10000";
+    document.getElementById("growth6h").value = getCookie("growth6h") || "100";
+    document.getElementById("growth1h").value = getCookie("growth1h") || "100";
+    document.getElementById("price-change-max").value = getCookie("priceChangeMax") || "10";
+    document.getElementById("price-change-min").value = getCookie("priceChangeMin") || "0";
+    document.getElementById("market-cap-rank").value = getCookie("marketCapRank") || "";
 }
 
-// Функция закрытия модального окна для фильтров
+// Функция для закрытия модального окна фильтров
 function closeFiltersModal() {
     document.getElementById('filter-modal').style.display = 'none';
 }
 
-// Функция сохранения фильтров: считываем значения из формы и сохраняем их в cookies
+// Функция для сохранения настроек фильтров на сервере
 function saveFilters() {
+    // Читаем значения из полей формы
     const volMin = document.getElementById("vol-min").value;
     const growth6h = document.getElementById("growth6h").value;
     const growth1h = document.getElementById("growth1h").value;
@@ -61,34 +41,67 @@ function saveFilters() {
     const priceChangeMin = document.getElementById("price-change-min").value;
     const marketCapRank = document.getElementById("market-cap-rank").value;
 
-    // Сохраняем каждое значение в cookie (на 30 дней)
-    setCookie("volMin", volMin, 30);
-    setCookie("growth6h", growth6h, 30);
-    setCookie("growth1h", growth1h, 30);
-    setCookie("priceChangeMax", priceChangeMax, 30);
-    setCookie("priceChangeMin", priceChangeMin, 30);
-    setCookie("marketCapRank", marketCapRank, 30);
+    // Формируем объект с настройками
+    const filters = {
+        volMin: volMin,
+        growth6h: growth6h,
+        growth1h: growth1h,
+        priceChangeMax: priceChangeMax,
+        priceChangeMin: priceChangeMin,
+        marketCapRank: marketCapRank
+    };
+
+    // Отправляем AJAX-запрос на сервер для сохранения настроек
+    fetch('/save_filters', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(filters)
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Ошибка сервера: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.error) {
+            alert(`Ошибка: ${data.error}`);
+        } else {
+            alert("Настройки фильтров сохранены");
+            // Сохраняем настройки в cookies для локального хранения (опционально)
+            setCookie("volMin", volMin, 30);
+            setCookie("growth6h", growth6h, 30);
+            setCookie("growth1h", growth1h, 30);
+            setCookie("priceChangeMax", priceChangeMax, 30);
+            setCookie("priceChangeMin", priceChangeMin, 30);
+            setCookie("marketCapRank", marketCapRank, 30);
+            // Обновляем данные (например, перезагружаем страницу)
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('Ошибка при сохранении фильтров:', error);
+        alert(`Ошибка при сохранении настроек: ${error.message}`);
+    });
 
     closeFiltersModal();
-
-    // Вызываем функцию для обновления данных (например, через AJAX или перезагрузка страницы)
-    refreshCryptoData();
 }
 
-// Пример функции для обновления данных (можно заменить на нужную реализацию)
-function refreshCryptoData() {
-    // Здесь можно собрать параметры из cookies и отправить AJAX запрос на сервер для получения новых данных.
-    // Пример: просто перезагрузим страницу
-    location.reload();
+// Функция закрытия модального окна для AI аналитики
+function closeModal() {
+    document.getElementById('modal').style.display = 'none';
 }
 
+// Функция для форматирования аналитического текста
 function formatAnalyticsContent(content) {
     if (!content) return '';
 
     return content
-        .replace(/###\s*(.*?)\n/g, '<h3>$1</h3>') // Преобразуем ### в заголовки
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Преобразуем **text** в жирный текст
-        .replace(/\n/g, '<br>'); // Преобразуем новые строки в <br>
+        .replace(/###\s*(.*?)\n/g, '<h3>$1</h3>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n/g, '<br>');
 }
 
 function showAIAnalytics(name, symbol) {
@@ -109,39 +122,33 @@ function showAIAnalytics(name, symbol) {
         },
         body: `name=${encodeURIComponent(name)}&symbol=${encodeURIComponent(symbol)}`
     })
-        .then(response => {
-            if (!response.ok) {
-                return response.text().then(err => {
-                    console.error('Ошибка на сервере:', err);
-                    throw new Error(`Ошибка сервера: ${response.status}`);
-                });
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.error) {
-                alert(`Ошибка: ${data.error}`);
-                modal.style.display = 'none';
-            } else {
-                modalLoading.style.display = 'none';
-                modalContent.style.display = 'block';
-                modalContent.innerHTML = formatAnalyticsContent(data.content); // Используем форматирование
-            }
-        })
-        .catch(error => {
-            console.error('Ошибка fetch:', error);
-            alert(`Произошла ошибка: ${error.message}`);
+    .then(response => {
+        if (!response.ok) {
+            return response.text().then(err => {
+                console.error('Ошибка на сервере:', err);
+                throw new Error(`Ошибка сервера: ${response.status}`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.error) {
+            alert(`Ошибка: ${data.error}`);
             modal.style.display = 'none';
-        });
+        } else {
+            modalLoading.style.display = 'none';
+            modalContent.style.display = 'block';
+            modalContent.innerHTML = formatAnalyticsContent(data.content);
+        }
+    })
+    .catch(error => {
+        console.error('Ошибка fetch:', error);
+        alert(`Произошла ошибка: ${error.message}`);
+        modal.style.display = 'none';
+    });
 }
 
-
-// Function to close the modal
-function closeModal() {
-    document.getElementById('modal').style.display = 'none';
-}
-
-// Function to sort table columns
+// Функция сортировки таблицы
 function sortTable(columnIndex, type) {
     const table = document.getElementById('cryptoTable');
     const rows = Array.from(table.rows).slice(1);
@@ -169,13 +176,9 @@ function sortTable(columnIndex, type) {
     table.dataset.sortDirection = direction;
 }
 
-// main.js
-
+// Функция для переключения избранного
 function toggleFavorite(coinId, currentVal) {
-    // Определяем новое значение (true -> false, false -> true)
     const newVal = !currentVal;
-
-    // Делаем запрос к Flask-приложению
     fetch('/toggle_favourite', {
         method: 'POST',
         headers: {
@@ -186,37 +189,34 @@ function toggleFavorite(coinId, currentVal) {
             isFavourites: newVal
         })
     })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Ошибка сервера: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.error) {
-                alert(`Ошибка: ${data.error}`);
-                return;
-            }
-
-            // Если успех, меняем текст кнопки
-            const button = document.getElementById(`favorite-button-${coinId}`);
-            if (newVal) {
-                button.textContent = 'Удалить';
-            } else {
-                button.textContent = 'Добавить';
-            }
-
-            // Также нужно обновить сам onclick, чтобы при следующем нажатии правильно передавалось новое текущее значение
-            button.setAttribute('onclick', `toggleFavorite('${coinId}', ${newVal})`);
-        })
-        .catch(error => {
-            console.error('Ошибка при toggleFavorite:', error);
-            alert(`Произошла ошибка: ${error.message}`);
-        });
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Ошибка сервера: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.error) {
+            alert(`Ошибка: ${data.error}`);
+            return;
+        }
+        const button = document.getElementById(`favorite-button-${coinId}`);
+        if (newVal) {
+            button.textContent = 'Удалить';
+        } else {
+            button.textContent = 'Добавить';
+        }
+        button.setAttribute('onclick', `toggleFavorite('${coinId}', ${newVal})`);
+    })
+    .catch(error => {
+        console.error('Ошибка при toggleFavorite:', error);
+        alert(`Произошла ошибка: ${error.message}`);
+    });
 }
 
-// Event listeners for modal buttons and sorting
-window.onload = function () {
+window.onload = function() {
+    console.log("main.js загружен");
+    // Обработчик для закрытия модального окна AI аналитики
     document.getElementById('close-modal').addEventListener('click', closeModal);
     // Обработчики для модального окна фильтров
     document.getElementById('open-filters-btn').addEventListener('click', openFiltersModal);

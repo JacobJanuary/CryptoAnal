@@ -94,9 +94,36 @@ def get_grok_invest(name, symbol):
 def index():
     try:
         cur = mysql.connection.cursor()
-        # Предположим, что данные для отображения формируются вызовом функции cg_GetFilteredCoins с параметрами по умолчанию
-        # Например: CALL cg_GetFilteredCoins(10000, 100, 100, 10, 0, NULL)
-        cur.execute("CALL cg_GetFilteredCoins(10000, 100, 100, 10, 0, NULL)")
+
+        # Если GET, то читаем сохраненные фильтры и используем их,
+        # если их нет, подставляем значения по умолчанию:
+        default_filters = {
+            "vol_min": 10000,
+            "growth6h": 100,
+            "growth1h": 100,
+            "price_change_max": 10,
+            "price_change_min": 0,
+            "market_cap_rank": None
+        }
+        cur.execute("SELECT vol_min, growth6h, growth1h, price_change_max, price_change_min, market_cap_rank FROM filter_settings WHERE id = 1")
+        row = cur.fetchone()
+        if row:
+            filters = {
+                "vol_min": row[0],
+                "growth6h": row[1],
+                "growth1h": row[2],
+                "price_change_max": row[3],
+                "price_change_min": row[4],
+                "market_cap_rank": row[5]
+            }
+        else:
+            filters = default_filters
+
+        # Формируем запрос к функции cg_GetFilteredCoins с нужными параметрами.
+        query = "CALL cg_GetFilteredCoins(%s, %s, %s, %s, %s, %s)"
+        params = (filters["vol_min"], filters["growth6h"], filters["growth1h"],
+                  filters["price_change_max"], filters["price_change_min"], filters["market_cap_rank"])
+        cur.execute(query, params)
         rows = cur.fetchall()
         col_names = [desc[0] for desc in cur.description]
         crypto_data = [dict(zip(col_names, row)) for row in rows]
@@ -175,6 +202,43 @@ def toggle_favourite():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+
+# Маршрут для сохранения настроек фильтров на сервере
+@app.route("/save_filters", methods=["POST"])
+def save_filters():
+    try:
+        data = request.get_json()
+        # Ожидаем, что входной JSON содержит ключи: volMin, growth6h, growth1h, priceChangeMax, priceChangeMin, marketCapRank
+        vol_min = data.get("volMin")
+        growth6h = data.get("growth6h")
+        growth1h = data.get("growth1h")
+        price_change_max = data.get("priceChangeMax")
+        price_change_min = data.get("priceChangeMin")
+        market_cap_rank = data.get("marketCapRank")
+
+        cur = mysql.connection.cursor()
+        # Если запись с id=1 уже существует, обновляем её
+        cur.execute("SELECT id FROM filter_settings WHERE id = 1")
+        row = cur.fetchone()
+        if row:
+            query = """
+                UPDATE filter_settings 
+                SET vol_min=%s, growth6h=%s, growth1h=%s, price_change_max=%s, price_change_min=%s, market_cap_rank=%s
+                WHERE id=1
+            """
+            cur.execute(query, (vol_min, growth6h, growth1h, price_change_max, price_change_min, market_cap_rank))
+        else:
+            query = """
+                INSERT INTO filter_settings (id, vol_min, growth6h, growth1h, price_change_max, price_change_min, market_cap_rank)
+                VALUES (1, %s, %s, %s, %s, %s, %s)
+            """
+            cur.execute(query, (vol_min, growth6h, growth1h, price_change_max, price_change_min, market_cap_rank))
+        mysql.connection.commit()
+        cur.close()
+        return jsonify({"success": True})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
