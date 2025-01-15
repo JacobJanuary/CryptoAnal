@@ -200,24 +200,6 @@ function sortTable(columnIndex, type) {
     rows.forEach(row => tbody.appendChild(row));
 }
 
-window.onload = function() {
-    console.log("main.js загружен");
-    // Обработчик для закрытия модального окна AI аналитики
-    document.getElementById('close-modal').addEventListener('click', closeModal);
-    // Обработчики для модального окна фильтров
-    document.getElementById('open-filters-btn').addEventListener('click', openFiltersModal);
-    document.getElementById('close-filters-btn').addEventListener('click', closeFiltersModal);
-    document.getElementById('save-filters-btn').addEventListener('click', saveFilters);
-
-    // Обработчик для сортировки таблицы вынесен за пределы цикла
-    document.querySelectorAll('#cryptoTable th[data-type]').forEach((header, index) => {
-        header.addEventListener('click', () => {
-            const type = header.getAttribute('data-type');
-            sortTable(index, type);
-        });
-    });
-};
-
 // Функция для переключения избранного
 function toggleFavorite(coinId, currentVal) {
     const newVal = !currentVal;
