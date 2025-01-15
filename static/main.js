@@ -1,5 +1,77 @@
 // main.js
+// Отображение модального окна с фильтрами
+function openFiltersModal() {
+    const modal = document.getElementById('filter-modal');
+    modal.style.display = 'block';
+}
 
+// Закрытие модального окна с фильтрами
+function closeFiltersModal() {
+    const modal = document.getElementById('filter-modal');
+    modal.style.display = 'none';
+}
+
+// Функция сохранения фильтров и обновления таблицы
+function saveFilters() {
+    // Чтение значений из полей
+    const volMin = document.getElementById('vol-min').value;
+    const growth6h = document.getElementById('growth6h').value;
+    const growth1h = document.getElementById('growth1h').value;
+    const priceChangeMax = document.getElementById('price-change-max').value;
+    const priceChangeMin = document.getElementById('price-change-min').value;
+    const marketCapRank = document.getElementById('market-cap-rank').value;
+
+    // Сохраняем параметры в localStorage (можно хранить как JSON-строку)
+    const filters = {
+        volMin: volMin || null,
+        growth6h: growth6h || null,
+        growth1h: growth1h || null,
+        priceChangeMax: priceChangeMax || null,
+        priceChangeMin: priceChangeMin || null,
+        marketCapRank: marketCapRank || null
+    };
+    localStorage.setItem('cryptoFilters', JSON.stringify(filters));
+
+    // Закрываем окно фильтров
+    closeFiltersModal();
+
+    // Вызываем функцию обновления таблицы с новыми фильтрами
+    refreshCryptoData();
+}
+
+// Функция обновления данных таблицы по фильтрам (пример запроса через AJAX)
+function refreshCryptoData() {
+    // Считываем сохраненные фильтры
+    const filters = JSON.parse(localStorage.getItem('cryptoFilters')) || {};
+
+    // Формируем параметры запроса (передаем их на сервер, если сервер принимает динамические фильтры)
+    // Пример для POST запроса:
+    fetch('/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(filters)
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.text().then(err => {
+                console.error('Ошибка на сервере:', err);
+                throw new Error(`Ошибка сервера: ${response.status}`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        // Предполагается, что сервер возвращает отфильтрованные данные
+        // Обновляем таблицу. Здесь можно перезагрузить страницу или обновить DOM
+        location.reload();
+    })
+    .catch(error => {
+        console.error('Ошибка при обновлении данных:', error);
+        alert(`Произошла ошибка: ${error.message}`);
+    });
+}
 function formatAnalyticsContent(content) {
     if (!content) return '';
 

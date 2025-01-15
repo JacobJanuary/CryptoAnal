@@ -93,14 +93,62 @@ def get_grok_invest(name, symbol):
 @app.route("/", methods=["GET", "POST"])
 def index():
     try:
+        # По умолчанию используем параметры:
+        # p_vol_min=10000, p_growth6h=100, p_growth1h=100, p_price_change_max=10, p_price_change_min=0, p_market_cap_rank=NULL
+        p_vol_min = 10000
+        p_growth6h = 100
+        p_growth1h = 100
+        p_price_change_max = 10
+        p_price_change_min = 0
+        p_market_cap_rank = None  # Если параметр равен NULL, фильтр не применяется
+
+        if request.method == "POST":
+            # Ожидаем, что POST-запрос приходит в формате JSON с нужными параметрами
+            data = request.get_json() or {}
+            # Если параметр отсутствует или равен пустой строке, оставляем значение по умолчанию (или NULL)
+            try:
+                p_vol_min = float(data.get("volMin", p_vol_min))
+            except:
+                pass
+            try:
+                p_growth6h = float(data.get("growth6h", p_growth6h))
+            except:
+                pass
+            try:
+                p_growth1h = float(data.get("growth1h", p_growth1h))
+            except:
+                pass
+            try:
+                p_price_change_max = float(data.get("priceChangeMax", p_price_change_max))
+            except:
+                pass
+            try:
+                p_price_change_min = float(data.get("priceChangeMin", p_price_change_min))
+            except:
+                pass
+            try:
+                # Если параметр не задан, оставляем NULL
+                market_cap_rank_val = data.get("marketCapRank")
+                if market_cap_rank_val is not None and market_cap_rank_val != "":
+                    p_market_cap_rank = int(market_cap_rank_val)
+                else:
+                    p_market_cap_rank = None
+            except:
+                p_market_cap_rank = None
+
+        # Формируем запрос к хранимой функции/процедуре cg_GetFilteredCoins с нужными параметрами.
+        # Если ваша функция/процедура возвращает результирующий набор, используем CALL:
+        query = "CALL cg_GetFilteredCoins(%s, %s, %s, %s, %s, %s)"
+        # Для p_market_cap_rank, если значение None, передаём SQL NULL (можно использовать None напрямую)
+        params = (p_vol_min, p_growth6h, p_growth1h, p_price_change_max, p_price_change_min, p_market_cap_rank)
+
         cur = mysql.connection.cursor()
-        # Предположим, что данные для отображения формируются вызовом функции cg_GetFilteredCoins с параметрами по умолчанию
-        # Например: CALL cg_GetFilteredCoins(10000, 100, 100, 10, 0, NULL)
-        cur.execute("CALL cg_GetFilteredCoins(10000, 100, 100, 10, 0, NULL)")
+        cur.execute(query, params)
         rows = cur.fetchall()
         col_names = [desc[0] for desc in cur.description]
         crypto_data = [dict(zip(col_names, row)) for row in rows]
         cur.close()
+
 
         # Если POST-запрос для аналитики и инвестиций
         if request.method == "POST":
