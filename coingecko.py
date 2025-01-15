@@ -89,7 +89,6 @@ def get_grok_invest(name, symbol):
         traceback.print_exc()
         return {"error": str(e)}
 
-
 @app.route("/", methods=["GET", "POST"])
 def index():
     try:
