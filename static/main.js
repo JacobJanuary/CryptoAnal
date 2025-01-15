@@ -148,31 +148,46 @@ function showAIAnalytics(name, symbol) {
     });
 }
 
-// Функция сортировки таблицы
 function sortTable(columnIndex, type) {
     const table = document.getElementById('cryptoTable');
-    const rows = Array.from(table.rows).slice(1);
-    const direction = table.dataset.sortDirection === 'asc' ? 'desc' : 'asc';
+    const tbody = table.tBodies[0];
+    const rows = Array.from(tbody.rows);
+
+    // Получаем текущее направление сортировки, если оно не задано – по умолчанию "asc"
+    let direction = table.dataset.sortDirection || 'asc';
+    // Переключаем направление
+    direction = (direction === 'asc') ? 'desc' : 'asc';
 
     rows.sort((a, b) => {
         let x = a.cells[columnIndex].textContent.trim();
         let y = b.cells[columnIndex].textContent.trim();
 
+        // Приведение к нужному типу
         if (type === 'number') {
-            x = parseFloat(x) || -Infinity;
-            y = parseFloat(y) || -Infinity;
+            x = parseFloat(x) || 0;
+            y = parseFloat(y) || 0;
         } else if (type === 'percent') {
-            x = parseFloat(x.replace('%', '')) || -Infinity;
-            y = parseFloat(y.replace('%', '')) || -Infinity;
+            x = parseFloat(x.replace('%','')) || 0;
+            y = parseFloat(y.replace('%','')) || 0;
         } else {
             x = x.toLowerCase();
             y = y.toLowerCase();
         }
 
-        return direction === 'asc' ? (x > y ? 1 : -1) : (x < y ? 1 : -1);
+        if (x === y) return 0;
+
+        if (direction === 'asc') {
+            return (x > y) ? 1 : -1;
+        } else {
+            return (x < y) ? 1 : -1;
+        }
     });
 
-    rows.forEach(row => table.tBodies[0].appendChild(row));
+    // Очистить tbody и вставить отсортированные строки
+    tbody.innerHTML = "";
+    rows.forEach(row => tbody.appendChild(row));
+
+    // Сохранить новое направление сортировки
     table.dataset.sortDirection = direction;
 }
 
