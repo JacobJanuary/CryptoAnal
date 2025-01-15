@@ -33,7 +33,7 @@
                 <tr>
                     <td>{{ crypto.name }} ({{ crypto.symbol }})</td>
                     <td>{{ crypto.market_cap_rank }}</td>
-                    <td>{{ crypto.vol_latest }}</td>
+                    <td>{{ crypto.vol_latest|format_volume }}</td>
                     <td>{{ crypto.vol_growth_6h|round(2) }}%</td>
                     <td>{{ crypto.vol_growth_1h|round(2) }}%</td>
                     <td>{{ crypto.price_change_6h|round(2) }}%</td>

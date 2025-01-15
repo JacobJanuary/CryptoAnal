@@ -21,16 +21,6 @@ app.config['MYSQL_DB'] = os.getenv("MYSQL_DATABASE", "crypto_db")
 
 mysql = MySQL(app)
 
-
-# Вспомогательные функции
-def format_volume(volume):
-    return f"{volume / 1_000_000:.2f} млн" if volume else "N/A"
-
-
-def format_price(price):
-    return f"{price:.2f}" if price else "N/A"
-
-
 # Получение аналитики с помощью API Grok
 def get_grok_analytics(name, symbol):
     if not XAI_API_KEY:
@@ -89,7 +79,13 @@ def get_grok_invest(name, symbol):
         traceback.print_exc()
         return {"error": str(e)}
 
-
+# Пользовательский фильтр для форматирования объема
+@app.template_filter('format_volume')
+def format_volume(value):
+    if value:
+        vol_str = f"${value / 1_000_000:.2f}".replace('.', ',')
+        return f"{vol_str} млн"
+    return "N/A"
 @app.route("/", methods=["GET", "POST"])
 def index():
     try:
