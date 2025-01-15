@@ -186,13 +186,6 @@ function sortTable(columnIndex, type) {
     table.dataset[`sortDirection${columnIndex}`] = newDirection;
 }
 
-    // Очистить tbody и вставить отсортированные строки
-    tbody.innerHTML = "";
-    rows.forEach(row => tbody.appendChild(row));
-
-    // Сохранить новое направление сортировки
-    table.dataset.sortDirection = direction;
-}
 
 // Функция для переключения избранного
 function toggleFavorite(coinId, currentVal) {
