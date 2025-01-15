@@ -7,6 +7,8 @@
     <script src="{{ url_for('static', filename='main.js') }}"></script>
 </head>
 <body>
+<!-- Кнопка для раскраски трендовых -->
+<button id="trend-button">Раскрасить трендовые</button>
 <!-- Кнопка для открытия модального окна настроек фильтров -->
 <button id="open-filters-btn">Customise</button>
 
@@ -30,7 +32,7 @@
             </thead>
             <tbody>
             {% for crypto in crypto_data %}
-                <tr>
+                <tr  data-coin-id="{{ crypto.coin_id }}">
                     <td>{{ crypto.name }} ({{ crypto.symbol }})</td>
                     <td>{{ crypto.market_cap_rank }}</td>
                     <td>{{ crypto.vol_latest|format_volume }}</td>

@@ -1,3 +1,59 @@
+// Функция для извлечения списка coin_id из таблицы
+function getTableCoinIds() {
+    const table = document.getElementById('cryptoTable');
+    const rows = table.tBodies[0].rows;
+    const coinIds = [];
+    for (let row of rows) {
+        const coinId = row.getAttribute('data-coin-id');
+        if (coinId) {
+            coinIds.push(coinId);
+        }
+    }
+    return coinIds;
+}
+
+// Функция для раскраски трендовых монет: теперь отправляем список coin_ids на сервер
+function colorTrendCoins() {
+    const coinIds = getTableCoinIds();
+    console.log("Отправляем следующие coin_id для фильтрации:", coinIds);
+
+    fetch('/trend_coins', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ coin_ids: coinIds })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Ошибка сервера: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.error) {
+            alert("Ошибка: " + data.error);
+            return;
+        }
+        const trendCoinIds = data.coin_ids;
+        console.log("Получены трендовые coin_id:", trendCoinIds);
+
+        // Проходим по всем строкам таблицы и добавляем класс "trend" тем, coin_id которых присутствует в списке
+        const table = document.getElementById('cryptoTable');
+        const rows = table.tBodies[0].rows;
+        for (let row of rows) {
+            row.classList.remove("trend"); // удаляем предыдущее окрашивание, если есть
+            const coinId = row.getAttribute('data-coin-id');
+            if (trendCoinIds.includes(coinId)) {
+                row.classList.add("trend");
+            }
+        }
+    })
+    .catch(error => {
+        console.error("Ошибка при получении трендовых монет:", error);
+        alert("Ошибка при получении трендовых монет: " + error.message);
+    });
+}
 // Функция установки cookie (на случай, если потребуется fallback, можно оставить)
 function setCookie(name, value, days) {
     const expires = days ? "; expires=" + new Date(Date.now() + days*864e5).toUTCString() : "";
@@ -244,6 +300,11 @@ function toggleFavorite(coinId, currentVal) {
 
 window.onload = function() {
     console.log("main.js загружен");
+    // Привяжите обработчик для кнопки трендовых
+    const trendButton = document.getElementById('trend-button');
+    if (trendButton) {
+        trendButton.addEventListener('click', colorTrendCoins);
+    }
     // Обработчик для закрытия модального окна AI аналитики
     document.getElementById('close-modal').addEventListener('click', closeModal);
     // Обработчики для модального окна фильтров
