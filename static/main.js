@@ -153,35 +153,46 @@ function sortTable(columnIndex, type) {
     const tbody = table.tBodies[0];
     const rows = Array.from(tbody.rows);
 
-    // Получаем текущее направление сортировки из атрибута заголовка
-    const header = table.querySelectorAll('th')[columnIndex];
-    let currentDirection = header.getAttribute('data-direction') || 'asc';
-    const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
+    // Считываем текущие значения сортировки
+    let currentDirection = table.dataset.sortDirection || 'asc';
+    let currentColumn = table.dataset.sortColumn || '-1';
 
-    // Устанавливаем атрибут data-direction на заголовке
-    header.setAttribute('data-direction', newDirection);
+    if (currentColumn === columnIndex.toString()) {
+        // Если нажали на тот же столбец, переключаем направление
+        currentDirection = currentDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        // Если переключились на другой столбец, начинаем с "asc"
+        currentDirection = 'asc';
+    }
 
     // Сортируем строки
     rows.sort((a, b) => {
         let x = a.cells[columnIndex].textContent.trim();
         let y = b.cells[columnIndex].textContent.trim();
 
-        // Приведение типов
-        if (type === 'number' || type === 'percent') {
+        // Приведение типов данных для корректного сравнения
+        if (type === 'number') {
             x = parseFloat(x.replace(/[^0-9.-]/g, '')) || 0;
             y = parseFloat(y.replace(/[^0-9.-]/g, '')) || 0;
+        } else if (type === 'percent') {
+            x = parseFloat(x.replace('%', '')) || 0;
+            y = parseFloat(y.replace('%', '')) || 0;
         } else {
             x = x.toLowerCase();
             y = y.toLowerCase();
         }
 
-        // Сравнение
-        return newDirection === 'asc' ? (x > y ? 1 : -1) : (x < y ? 1 : -1);
+        if (x === y) return 0;
+        return (currentDirection === 'asc' ? (x > y ? 1 : -1) : (x < y ? 1 : -1));
     });
 
     // Перестраиваем таблицу
     tbody.innerHTML = '';
     rows.forEach(row => tbody.appendChild(row));
+
+    // Сохраняем текущее направление и колонку в data-атрибутах таблицы
+    table.dataset.sortDirection = currentDirection;
+    table.dataset.sortColumn = columnIndex.toString();
 }
 
 // Функция для переключения избранного
