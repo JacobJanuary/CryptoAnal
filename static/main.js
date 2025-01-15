@@ -153,17 +153,16 @@ function sortTable(columnIndex, type) {
     const tbody = table.tBodies[0];
     const rows = Array.from(tbody.rows);
 
-    // Сохраняем общее направление сортировки в data-атрибут таблицы
-    const currentDirection = table.dataset.sortDirection || 'asc';
-    const currentColumn = table.dataset.sortColumn || '-1';
+    // Считываем текущие значения сортировки
+    let currentDirection = table.dataset.sortDirection || 'asc';
+    let currentColumn = table.dataset.sortColumn || '-1';
 
-    let newDirection;
     if (currentColumn === columnIndex.toString()) {
         // Если нажали на тот же столбец, переключаем направление
-        newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
+        currentDirection = currentDirection === 'asc' ? 'desc' : 'asc';
     } else {
         // Если переключились на другой столбец, начинаем с "asc"
-        newDirection = 'asc';
+        currentDirection = 'asc';
     }
 
     // Сортируем строки
@@ -184,15 +183,15 @@ function sortTable(columnIndex, type) {
         }
 
         if (x === y) return 0;
-        return (newDirection === 'asc' ? (x > y ? 1 : -1) : (x < y ? 1 : -1));
+        return (currentDirection === 'asc' ? (x > y ? 1 : -1) : (x < y ? 1 : -1));
     });
 
     // Перестраиваем таблицу
     tbody.innerHTML = '';
     rows.forEach(row => tbody.appendChild(row));
 
-    // Сохраняем текущее направление и колонку в data-атрибуты таблицы
-    table.dataset.sortDirection = newDirection;
+    // Сохраняем текущее направление и колонку в data-атрибутах таблицы
+    table.dataset.sortDirection = currentDirection;
     table.dataset.sortColumn = columnIndex.toString();
 }
 
