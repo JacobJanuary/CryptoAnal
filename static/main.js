@@ -157,8 +157,8 @@ function sortTable(columnIndex, type) {
     let currentDirection = table.dataset.sortDirection || 'asc';
     let currentColumn = table.dataset.sortColumn || '-1';
 
+    // Если нажали на тот же столбец, меняем направление
     if (currentColumn === columnIndex.toString()) {
-        // Если нажали на тот же столбец, переключаем направление
         currentDirection = currentDirection === 'asc' ? 'desc' : 'asc';
     } else {
         // Если переключились на другой столбец, начинаем с "asc"
@@ -182,8 +182,10 @@ function sortTable(columnIndex, type) {
             y = y.toLowerCase();
         }
 
+        // Сравнение в зависимости от направления
         if (x === y) return 0;
         return (currentDirection === 'asc' ? (x > y ? 1 : -1) : (x < y ? 1 : -1));
+
     });
 
     // Перестраиваем таблицу
