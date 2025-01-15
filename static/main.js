@@ -148,38 +148,37 @@ function showAIAnalytics(name, symbol) {
     });
 }
 
+// ... (остальные функции: setCookie, getCookie, openFiltersModal, closeFiltersModal, saveFilters, closeModal, formatAnalyticsContent, showAIAnalytics - без изменений) ...
+
 function sortTable(columnIndex, type) {
     const table = document.getElementById('cryptoTable');
     const tbody = table.tBodies[0];
     const rows = Array.from(tbody.rows);
-    const currentColumn = table.dataset.sortColumn;
-    let currentDirection = table.dataset.sortDirection || 'asc';
 
     // Определяем направление сортировки
-    if (currentColumn === columnIndex.toString()) {
-        currentDirection = currentDirection === 'asc' ? 'desc' : 'asc';
-    } else {
-        currentDirection = 'asc';
-    }
+    const currentDirection = table.dataset.sortDirection || 'asc';
+    const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
 
     // Устанавливаем data-атрибуты для текущего столбца
+    table.dataset.sortDirection = newDirection;
     table.dataset.sortColumn = columnIndex.toString();
-    table.dataset.sortDirection = currentDirection;
 
-    // Добавляем класс sorted- к заголовку
+    // Убираем классы сортировки у всех заголовков
     const headers = table.querySelectorAll('th');
-    headers.forEach((header, index) => {
+    headers.forEach(header => {
         header.classList.remove('sorted-asc', 'sorted-desc');
-        if (index === columnIndex) {
-            header.classList.add(currentDirection === 'asc' ? 'sorted-asc' : 'sorted-desc');
-        }
     });
+
+    // Добавляем класс сортировки к текущему заголовку
+    const currentHeader = headers[columnIndex];
+    currentHeader.classList.add(newDirection === 'asc' ? 'sorted-asc' : 'sorted-desc');
 
     // Сортируем строки
     rows.sort((a, b) => {
         let x = a.cells[columnIndex].textContent.trim();
         let y = b.cells[columnIndex].textContent.trim();
 
+        // Приведение типов
         if (type === 'number' || type === 'percent') {
             x = parseFloat(x.replace(/[^0-9.-]/g, '')) || 0;
             y = parseFloat(y.replace(/[^0-9.-]/g, '')) || 0;
@@ -188,11 +187,8 @@ function sortTable(columnIndex, type) {
             y = y.toLowerCase();
         }
 
-        if (currentDirection === 'asc') {
-            return x > y ? 1 : (x < y ? -1 : 0);
-        } else {
-            return x < y ? 1 : (x > y ? -1 : 0);
-        }
+        // Сравнение
+        return newDirection === 'asc' ? (x > y ? 1 : -1) : (x < y ? 1 : -1);
     });
 
     // Перестраиваем таблицу
