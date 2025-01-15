@@ -153,16 +153,25 @@ function sortTable(columnIndex, type) {
     const tbody = table.tBodies[0];
     const rows = Array.from(tbody.rows);
 
-    // Используем data-атрибут таблицы для хранения направления сортировки
-    let currentDirection = table.getAttribute(`data-sort-direction-${columnIndex}`) || 'asc';
-    const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
+    // Сохраняем общее направление сортировки в data-атрибут таблицы
+    const currentDirection = table.dataset.sortDirection || 'asc';
+    const currentColumn = table.dataset.sortColumn || '-1';
+
+    let newDirection;
+    if (currentColumn === columnIndex.toString()) {
+        // Если нажали на тот же столбец, переключаем направление
+        newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        // Если переключились на другой столбец, начинаем с "asc"
+        newDirection = 'asc';
+    }
 
     // Сортируем строки
     rows.sort((a, b) => {
         let x = a.cells[columnIndex].textContent.trim();
         let y = b.cells[columnIndex].textContent.trim();
 
-        // Приведение типов данных для сравнения
+        // Приведение типов данных для корректного сравнения
         if (type === 'number') {
             x = parseFloat(x.replace(/[^0-9.-]/g, '')) || 0;
             y = parseFloat(y.replace(/[^0-9.-]/g, '')) || 0;
@@ -178,12 +187,13 @@ function sortTable(columnIndex, type) {
         return (newDirection === 'asc' ? (x > y ? 1 : -1) : (x < y ? 1 : -1));
     });
 
-    // Перестраиваем строки таблицы
+    // Перестраиваем таблицу
     tbody.innerHTML = '';
     rows.forEach(row => tbody.appendChild(row));
 
-    // Сохраняем новое направление сортировки для данного столбца
-    table.setAttribute(`data-sort-direction-${columnIndex}`, newDirection);
+    // Сохраняем текущее направление и колонку в data-атрибуты таблицы
+    table.dataset.sortDirection = newDirection;
+    table.dataset.sortColumn = columnIndex.toString();
 }
 
 // Функция для переключения избранного
