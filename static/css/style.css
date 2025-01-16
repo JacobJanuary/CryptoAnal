@@ -187,6 +187,23 @@ button:hover {
     cursor: pointer;
     z-index: 2100;
 }
+
 .trend {
     background-color: #ffe0b2 !important; /* светло-оранжевый фон */
+}
+
+/* Стили для кнопок трендовых категорий */
+#trend-buttons-container {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 2100;
+}
+
+#trend-buttons-container button {
+    margin: 5px;
+    padding: 5px 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
 }
