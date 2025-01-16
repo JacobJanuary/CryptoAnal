@@ -11,7 +11,6 @@ function getCookie(name) {
         return parts[0] === name ? decodeURIComponent(parts[1]) : r;
     }, '');
 }
-
 // Функция для открытия модального окна фильтров
 function openFiltersModal() {
     const modal = document.getElementById('filter-modal');
