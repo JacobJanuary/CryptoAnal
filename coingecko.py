@@ -130,6 +130,23 @@ def index():
         crypto_data = [dict(zip(col_names, row)) for row in rows]
         cur.close()
 
+        # Дополнительный запрос: для всех coin_id получить значение about_what из таблиц coin_category_relation и CG_Categories
+        if crypto_data:
+            coin_ids = [coin['coin_id'] for coin in crypto_data]
+            format_str = ','.join(['%s'] * len(coin_ids))
+            cur = mysql.connection.cursor()
+            cur.execute(f"""
+                        SELECT ccr.coin_id, MIN(cc.about_what) AS about_what
+                        FROM coin_category_relation ccr
+                        JOIN CG_Categories cc ON ccr.category_id = cc.category_id
+                        WHERE ccr.coin_id IN ({format_str})
+                        GROUP BY ccr.coin_id
+                    """, tuple(coin_ids))
+            mapping = {row[0]: row[1] for row in cur.fetchall()}
+            cur.close()
+            # Объединяем данные с результатом mapping; если для монеты нет значения, оставляем пустую строку
+            for coin in crypto_data:
+                coin['about_what'] = mapping.get(coin['coin_id'], "")
         # Если POST-запрос для аналитики и инвестиций
         if request.method == "POST":
             name = request.form.get("name")
