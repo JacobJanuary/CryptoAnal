@@ -301,7 +301,6 @@ window.onload = function() {
             sortTable(index, type);
         });
     });
-
     // Инициализируем tooltip
     setupCategoryTooltips();
 };
