@@ -275,30 +275,35 @@ def save_filters():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-
 @app.route("/trend_coins", methods=["POST"])
 def trend_coins():
     try:
         data = request.get_json()
         coin_ids = data.get("coin_ids", [])
         if not coin_ids:
-            return jsonify({"coin_ids": []})
+            return jsonify({"trends": []})
 
         cur = mysql.connection.cursor()
         # Формируем строку параметров для оператора IN
         format_strings = ','.join(['%s'] * len(coin_ids))
         query = f"""
-            SELECT DISTINCT ccr.coin_id
-            FROM coin_category_relation ccr
-            JOIN CG_Categories cc ON ccr.category_id = cc.category_id
-            WHERE cc.about_what <> 0
-              AND ccr.coin_id IN ({format_strings})
+            WITH trend_data AS (
+              SELECT 
+                ccr.coin_id,
+                MIN(cc.about_what) AS about_what
+              FROM coin_category_relation ccr
+              JOIN CG_Categories cc ON ccr.category_id = cc.category_id
+              WHERE cc.about_what <> 0
+                AND ccr.coin_id IN ({format_strings})
+              GROUP BY ccr.coin_id
+            )
+            SELECT coin_id, about_what FROM trend_data;
         """
         cur.execute(query, tuple(coin_ids))
         rows = cur.fetchall()
-        trend_ids = [row[0] for row in rows]
+        trends = [{"coin_id": row[0], "about_what": row[1]} for row in rows]
         cur.close()
-        return jsonify({"coin_ids": trend_ids})
+        return jsonify({"trends": trends})
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
