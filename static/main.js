@@ -17,19 +17,22 @@ function colorByCategory(btnLabel) {
     const table = document.getElementById('cryptoTable');
     const rows = table.tBodies[0].rows;
 
-    // Удаляем предыдущие подсветки
+    // Убираем предыдущие стили
     for (let row of rows) {
+        row.classList.remove("trend");
         row.style.backgroundColor = "";
     }
 
+    console.log("colorByCategory вызывается для кнопки: " + btnLabel);
+
     for (let row of rows) {
-        const aboutValue = parseInt(row.getAttribute("data-coin-about"));
-        if (!aboutValue) continue;
+        const aboutValueStr = row.getAttribute("data-coin-about");
+        const aboutValue = parseInt(aboutValueStr);
+        console.log("Строка с coin_id", row.getAttribute("data-coin-id"), "about:", aboutValue);
 
         let applyColor = null;
 
         if (btnLabel === "Все трендовые") {
-            // Для всех трендовых, выбираем цвет из сопоставления в зависимости от конкретного aboutValue:
             for (const key in categoryColors) {
                 const config = categoryColors[key];
                 if (config.code && aboutValue === config.code) {
@@ -43,7 +46,6 @@ function colorByCategory(btnLabel) {
                 }
             }
         } else {
-            // Для конкретной категории, например "Мемы", "Фонды" и т.д.
             const config = categoryColors[btnLabel];
             if (config) {
                 if (config.code && aboutValue === config.code) {
@@ -57,6 +59,7 @@ function colorByCategory(btnLabel) {
         }
 
         if (applyColor) {
+            console.log("Применяю цвет", applyColor, "для coin_id", row.getAttribute("data-coin-id"));
             row.style.backgroundColor = applyColor;
         }
     }
@@ -79,8 +82,12 @@ function setupCategoryButtons() {
 
     buttonIds.forEach(item => {
         const btn = document.getElementById(item.id);
+        console.log(`Ищу кнопку ${item.id}:`, btn);
         if (btn) {
-            btn.addEventListener('click', () => colorByCategory(item.label));
+            btn.addEventListener('click', () => {
+                console.log(`Нажата кнопка ${item.label}`);
+                colorByCategory(item.label);
+            });
         }
     });
 }
