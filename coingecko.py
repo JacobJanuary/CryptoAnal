@@ -21,7 +21,7 @@ app.config['MYSQL_DB'] = os.getenv("MYSQL_DATABASE", "crypto_db")
 
 mysql = MySQL(app)
 
-# Получение аналитики с помощью API Grok
+# Получение аналитики с помощью API Grok офигеннен
 def get_grok_analytics(name, symbol):
     if not XAI_API_KEY:
         error_msg = "API ключ не установлен. Установите переменную окружения XAI_API_KEY."

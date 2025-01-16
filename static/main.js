@@ -4,7 +4,7 @@ function setCookie(name, value, days) {
     document.cookie = name + "=" + encodeURIComponent(value) + expires + "; path=/";
 }
 
-// Функция получения cookie по имени (если потребуется)
+// Функция получения cookie по имени (если потребуется. А он потребуется)
 function getCookie(name) {
     return document.cookie.split('; ').reduce((r, v) => {
         const parts = v.split('=');
