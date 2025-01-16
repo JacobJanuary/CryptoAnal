@@ -1,22 +1,26 @@
 let tooltipDiv = null;
 
 function showCategoryTooltip(event) {
-    // Получаем значение data-categories из элемента, на который навёлся пользователь
-    const categories = event.target.getAttribute('data-categories');
-    if (!categories || categories.trim() === "") {
-        return; // Если нет категорий, не показываем tooltip
+    // Получаем <tr> или <td> через event.currentTarget (зависит от того, куда именно навешиваем обработчики)
+    const targetElem = event.currentTarget;
+    if (!targetElem) return;
+
+    // Считываем список категорий из data-атрибута
+    const categories = targetElem.getAttribute('data-categories');
+    if (!categories || categories.trim() === '') {
+        return;
     }
-
+    // Отображаем tooltip
     tooltipDiv.style.display = 'block';
-    tooltipDiv.textContent = categories; // Выводим строку категорий
+    tooltipDiv.textContent = categories; // Выводим список категорий
 
-    // Задаём позицию tooltip (немного смещаем, чтобы не загораживать курсор)
+    // Первое позиционирование (примерно рядом с курсором)
     tooltipDiv.style.left = (event.pageX + 10) + 'px';
     tooltipDiv.style.top = (event.pageY + 10) + 'px';
 }
 
 function moveCategoryTooltip(event) {
-    // Двигаем tooltip вслед за мышкой
+    // Двигаем tooltip вслед за курсором
     tooltipDiv.style.left = (event.pageX + 10) + 'px';
     tooltipDiv.style.top = (event.pageY + 10) + 'px';
 }
@@ -25,17 +29,22 @@ function hideCategoryTooltip() {
     tooltipDiv.style.display = 'none';
 }
 
-// Функция, навешивающая обработчики на ячейки/строки таблицы
+// Навешиваем обработчики на каждую строку таблицы
 function setupCategoryTooltips() {
     tooltipDiv = document.getElementById('category-tooltip');
+    if (!tooltipDiv) {
+        console.warn("Элемент #category-tooltip не найден!");
+        return;
+    }
     const table = document.getElementById('cryptoTable');
-    // Предположим, что категорией обладает ячейка с именем (колонка 0)
-    // или вся строка, если атрибут data-categories задан на уровне <tr>.
-    // Допустим, вы храните атрибут data-categories в <td> с индексом 0:
-    // Или хотим для всех ячеек - тогда на всё row
+    if (!table) {
+        console.warn("Таблица #cryptoTable не найдена!");
+        return;
+    }
+
     const rows = table.tBodies[0].rows;
     for (let row of rows) {
-        // Для каждого row / или для row.cells[x]
+        // навешиваем события на <tr>
         row.addEventListener('mouseover', showCategoryTooltip);
         row.addEventListener('mousemove', moveCategoryTooltip);
         row.addEventListener('mouseout', hideCategoryTooltip);
