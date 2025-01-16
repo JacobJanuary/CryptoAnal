@@ -225,7 +225,7 @@ def toggle_favourite():
 def save_filters():
     try:
         data = request.get_json()
-        # Получаем значения фильтров из входного JSON
+        # Ожидаем, что входной JSON содержит ключи: volMin, growth6h, growth1h, priceChangeMax, priceChangeMin, marketCapRank
         vol_min = data.get("volMin")
         growth6h = data.get("growth6h")
         growth1h = data.get("growth1h")
@@ -233,42 +233,8 @@ def save_filters():
         price_change_min = data.get("priceChangeMin")
         market_cap_rank = data.get("marketCapRank")
 
-        # Преобразуем значения к числовому типу и заменяем нули на None
-        try:
-            vol_min = float(vol_min) if vol_min is not None and float(vol_min) != 0 else None
-        except:
-            vol_min = None
-
-        try:
-            growth6h = float(growth6h) if growth6h is not None and float(growth6h) != 0 else None
-        except:
-            growth6h = None
-
-        try:
-            growth1h = float(growth1h) if growth1h is not None and float(growth1h) != 0 else None
-        except:
-            growth1h = None
-
-        try:
-            price_change_max = float(price_change_max) if price_change_max is not None and float(
-                price_change_max) != 0 else None
-        except:
-            price_change_max = None
-
-        try:
-            price_change_min = float(price_change_min) if price_change_min is not None and float(
-                price_change_min) != 0 else None
-        except:
-            price_change_min = None
-
-        try:
-            market_cap_rank = int(market_cap_rank) if market_cap_rank is not None and int(
-                market_cap_rank) != 0 else None
-        except:
-            market_cap_rank = None
-
         cur = mysql.connection.cursor()
-        # Если запись с id = 1 уже существует, обновляем её
+        # Если запись с id=1 уже существует, обновляем её
         cur.execute("SELECT id FROM filter_settings WHERE id = 1")
         row = cur.fetchone()
         if row:
