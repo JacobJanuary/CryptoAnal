@@ -124,6 +124,36 @@ def index():
         crypto_data = [dict(zip(col_names, row)) for row in rows]
         cur.close()
 
+        # После того как получили crypto_data (массив словарей, содержащих coin_id и т.д.)
+        if crypto_data:
+            coin_ids = [coin['coin_id'] for coin in crypto_data]
+            if coin_ids:
+                format_str = ','.join(['%s'] * len(coin_ids))
+                cur = mysql.connection.cursor()
+                cur.execute(f"""
+                    SELECT ccr.coin_id, cc.name
+                    FROM coin_category_relation ccr
+                    JOIN CG_Categories cc ON ccr.category_id = cc.category_id
+                    WHERE ccr.coin_id IN ({format_str})
+                    ORDER BY cc.Weight ASC
+                """, tuple(coin_ids))
+                rows = cur.fetchall()  # [(coin_id, category_name), ...]
+
+                # Построим mapping coin_id -> [список категорий]
+                from collections import defaultdict
+                cat_map = defaultdict(list)
+                for r in rows:
+                    c_id = r[0]
+                    cat_name = r[1]
+                    cat_map[c_id].append(cat_name)
+
+                # Для каждой монеты собираем строку категорий
+                for coin in crypto_data:
+                    c_id = coin['coin_id']
+                    categories_list = cat_map.get(c_id, [])
+                    # Сформируем строку "Cat1, Cat2, Cat3"
+                    coin['categories_str'] = ", ".join(categories_list)
+
         # Если POST-запрос для аналитики и инвестиций
         if request.method == "POST":
             name = request.form.get("name")

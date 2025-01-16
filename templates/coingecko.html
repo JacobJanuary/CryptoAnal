@@ -29,7 +29,9 @@
             </thead>
             <tbody>
             {% for crypto in crypto_data %}
-                <tr>
+                <tr data-coin-id="{{ crypto.coin_id }}"
+                    data-coin-about="{{ crypto.about_what }}"
+                    data-categories="{{ crypto.categories_str }}">
                     <td>{{ crypto.name }} ({{ crypto.symbol }})</td>
                     <td>{{ crypto.market_cap_rank }}</td>
                     <td>{{ crypto.vol_latest|format_volume }}</td>
@@ -81,29 +83,34 @@
 </div>
 
 
-    <!-- Модальное окно для настройки фильтров -->
-    <div id="filter-modal">
-        <h3>Настройки фильтров</h3>
-        <label for="vol-min">Минимальный текущий объем (vol_latest):</label>
-        <input type="number" id="vol-min" placeholder="Например, 10000">
+<!-- Модальное окно для настройки фильтров -->
+<div id="filter-modal">
+    <h3>Настройки фильтров</h3>
+    <label for="vol-min">Минимальный текущий объем (vol_latest):</label>
+    <input type="number" id="vol-min" placeholder="Например, 10000">
 
-        <label for="growth6h">Минимальный прирост объема за 6 ч (от 0 до 255%):</label>
-        <input type="number" id="growth6h" placeholder="Например, 100">
+    <label for="growth6h">Минимальный прирост объема за 6 ч (от 0 до 255%):</label>
+    <input type="number" id="growth6h" placeholder="Например, 100">
 
-        <label for="growth1h">Минимальный прирост объема за 1 ч (от 0 до 255%):</label>
-        <input type="number" id="growth1h" placeholder="Например, 100">
+    <label for="growth1h">Минимальный прирост объема за 1 ч (от 0 до 255%):</label>
+    <input type="number" id="growth1h" placeholder="Например, 100">
 
-        <label for="price-change-max">Макс. изменение цены за 6 ч (0-100%):</label>
-        <input type="number" id="price-change-max" placeholder="Например, 10">
+    <label for="price-change-max">Макс. изменение цены за 6 ч (0-100%):</label>
+    <input type="number" id="price-change-max" placeholder="Например, 10">
 
-        <label for="price-change-min">Мин. изменение цены за 6 ч (0-100%):</label>
-        <input type="number" id="price-change-min" placeholder="Например, 0">
+    <label for="price-change-min">Мин. изменение цены за 6 ч (0-100%):</label>
+    <input type="number" id="price-change-min" placeholder="Например, 0">
 
-        <label for="market-cap-rank">Максимальный Market Cap Rank (0-9999):</label>
-        <input type="number" id="market-cap-rank" placeholder="Например, 1000">
+    <label for="market-cap-rank">Максимальный Market Cap Rank (0-9999):</label>
+    <input type="number" id="market-cap-rank" placeholder="Например, 1000">
 
-        <button id="save-filters-btn">Сохранить</button>
-        <button id="close-filters-btn">Закрыть</button>
-    </div>
+    <button id="save-filters-btn">Сохранить</button>
+    <button id="close-filters-btn">Закрыть</button>
+</div>
+
+<div id="category-tooltip"
+     style="display: none; position: absolute; pointer-events: none; background-color: #fff; border: 1px solid #ccc; padding: 5px; z-index: 9999; border-radius: 4px;">
+    <!-- Внутренний текст tooltip будет задаваться из JS -->
+</div>
 </body>
 </html>

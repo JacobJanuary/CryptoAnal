@@ -1,3 +1,47 @@
+let tooltipDiv = null;
+
+function showCategoryTooltip(event) {
+    // Получаем значение data-categories из элемента, на который навёлся пользователь
+    const categories = event.target.getAttribute('data-categories');
+    if (!categories || categories.trim() === "") {
+        return; // Если нет категорий, не показываем tooltip
+    }
+
+    tooltipDiv.style.display = 'block';
+    tooltipDiv.textContent = categories; // Выводим строку категорий
+
+    // Задаём позицию tooltip (немного смещаем, чтобы не загораживать курсор)
+    tooltipDiv.style.left = (event.pageX + 10) + 'px';
+    tooltipDiv.style.top = (event.pageY + 10) + 'px';
+}
+
+function moveCategoryTooltip(event) {
+    // Двигаем tooltip вслед за мышкой
+    tooltipDiv.style.left = (event.pageX + 10) + 'px';
+    tooltipDiv.style.top = (event.pageY + 10) + 'px';
+}
+
+function hideCategoryTooltip() {
+    tooltipDiv.style.display = 'none';
+}
+
+// Функция, навешивающая обработчики на ячейки/строки таблицы
+function setupCategoryTooltips() {
+    tooltipDiv = document.getElementById('category-tooltip');
+    const table = document.getElementById('cryptoTable');
+    // Предположим, что категорией обладает ячейка с именем (колонка 0)
+    // или вся строка, если атрибут data-categories задан на уровне <tr>.
+    // Допустим, вы храните атрибут data-categories в <td> с индексом 0:
+    // Или хотим для всех ячеек - тогда на всё row
+    const rows = table.tBodies[0].rows;
+    for (let row of rows) {
+        // Для каждого row / или для row.cells[x]
+        row.addEventListener('mouseover', showCategoryTooltip);
+        row.addEventListener('mousemove', moveCategoryTooltip);
+        row.addEventListener('mouseout', hideCategoryTooltip);
+    }
+}
+
 // Функция установки cookie (на случай, если потребуется fallback, можно оставить)
 function setCookie(name, value, days) {
     const expires = days ? "; expires=" + new Date(Date.now() + days*864e5).toUTCString() : "";
@@ -257,4 +301,7 @@ window.onload = function() {
             sortTable(index, type);
         });
     });
+
+    // Инициализируем tooltip
+    setupCategoryTooltips();
 };
