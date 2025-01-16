@@ -21,44 +21,40 @@ function colorByCategory(btnLabel) {
         row.style.backgroundColor = "";
     }
 
-    console.log("colorByCategory вызывается для кнопки: " + btnLabel);
+    console.log("colorByCategory вызывается для кнопки:", btnLabel);
 
     for (let row of rows) {
         const coinId = row.getAttribute('data-coin-id');
-        const aboutValue = parseInt(row.getAttribute("data-coin-about"));
-        if (!aboutValue) continue;
+        const aboutStr = row.getAttribute("data-coin-about");
+        const aboutValue = parseInt(aboutStr);
+        console.log(`Строка coin_id=${coinId}, about_what=${aboutStr}`);
+        if (isNaN(aboutValue)) {
+            console.log(`Невозможно распарсить about_what для coin_id=${coinId}`);
+            continue;
+        }
 
         let applyColor = null;
-        if (btnLabel === "Все трендовые") {
-            // Для всех трендовых пробегаем по всем категориям
-            for (const key in categoryColors) {
-                const config = categoryColors[key];
-                if (config.code && aboutValue === config.code) {
-                    applyColor = config.color;
-                    break;
-                } else if (config.range) {
-                    if (aboutValue >= config.range[0] && aboutValue <= config.range[1]) {
-                        applyColor = config.color;
-                        break;
-                    }
-                }
-            }
+        // Получаем конфигурацию для данной кнопки
+        const config = categoryColors[btnLabel];
+        if (!config) {
+            console.log(`Нет конфигурации для категории: ${btnLabel}`);
         } else {
-            // Для конкретной кнопки
-            const config = categoryColors[btnLabel];
-            if (config) {
-                if (config.code && aboutValue === config.code) {
+            if (config.code !== undefined) {
+                if (aboutValue === config.code) {
                     applyColor = config.color;
-                } else if (config.range) {
-                    if (aboutValue >= config.range[0] && aboutValue <= config.range[1]) {
-                        applyColor = config.color;
-                    }
+                }
+            } else if (config.range) {
+                if (aboutValue >= config.range[0] && aboutValue <= config.range[1]) {
+                    applyColor = config.color;
                 }
             }
         }
+
         if (applyColor) {
-            console.log("Применяю цвет", applyColor, "для coin_id", coinId);
+            console.log(`Применяю цвет ${applyColor} для coin_id ${coinId}`);
             row.style.backgroundColor = applyColor;
+        } else {
+            console.log(`Для coin_id ${coinId} категория about_what=${aboutValue} не соответствует ${btnLabel}`);
         }
     }
 }
