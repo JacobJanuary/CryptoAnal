@@ -7,10 +7,20 @@
     <script src="{{ url_for('static', filename='main.js') }}"></script>
 </head>
 <body>
-<!-- Кнопка для раскраски трендовых -->
-<button id="trend-button">Раскрасить трендовые</button>
-<!-- Кнопка для открытия модального окна настроек фильтров -->
-<button id="open-filters-btn">Customise</button>
+  <!-- Кнопка Customise и кнопка для настройки трендовых -->
+  <button id="open-filters-btn">Customise</button>
+  <div id="trend-buttons-container">
+    <button id="btn-all-trended">Все трендовые</button>
+    <button id="btn-fonds">Фонды</button>
+    <button id="btn-memes">Мемы</button>
+    <button id="btn-musk">Маск</button>
+    <button id="btn-ai">Ai</button>
+    <button id="btn-infra">Infrastructure</button>
+    <button id="btn-depin">dePin</button>
+    <button id="btn-gamefi">GameFi</button>
+    <button id="btn-rwa">RWA</button>
+    <button id="btn-other">Other trended</button>
+  </div>
 
 <h1>Фильтрованные криптовалюты (CoinGecko)</h1>
 {% if crypto_data %}
@@ -32,7 +42,7 @@
             </thead>
             <tbody>
             {% for crypto in crypto_data %}
-                <tr  data-coin-id="{{ crypto.coin_id }}">
+                <tr data-coin-id="{{ crypto.coin_id }}" data-coin-about="{{ crypto.about_what }}">
                     <td>{{ crypto.name }} ({{ crypto.symbol }})</td>
                     <td>{{ crypto.market_cap_rank }}</td>
                     <td>{{ crypto.vol_latest|format_volume }}</td>

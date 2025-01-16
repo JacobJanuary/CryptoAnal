@@ -1,3 +1,90 @@
+// Объект с сопоставлением категории и цвета
+const categoryColors = {
+    // Ключ — название кнопки; значение — либо числовой код, либо объект для диапазона
+    "Фонды": { code: 1, color: "#F0FFF0" },
+    "Мемы": { code: 2, color: "#FFF0F5" },
+    "Маск": { code: 3, color: "#FFFACD" },
+    "Ai": { code: 4, color: "#E6E6FA" },
+    "Infrastructure": { code: 5, color: "#F0FFFF" },
+    "dePin": { code: 6, color: "#F5F5DC" },
+    "GameFi": { code: 7, color: "#FAF0E6" },
+    "RWA": { code: 8, color: "#FFE4E1" },
+    "Other trended": { range: [9, 18], color: "#F8F8FF" }
+};
+
+// Функция для применения раскраски по конкретной категории (если btnLabel равен "Все трендовые", то обрабатываем все, где about_what != 0)
+function colorByCategory(btnLabel) {
+    const table = document.getElementById('cryptoTable');
+    const rows = table.tBodies[0].rows;
+
+    // Удаляем предыдущие подсветки
+    for (let row of rows) {
+        row.style.backgroundColor = "";
+    }
+
+    for (let row of rows) {
+        const aboutValue = parseInt(row.getAttribute("data-coin-about"));
+        if (!aboutValue) continue;
+
+        let applyColor = null;
+
+        if (btnLabel === "Все трендовые") {
+            // Для всех трендовых, выбираем цвет из сопоставления в зависимости от конкретного aboutValue:
+            for (const key in categoryColors) {
+                const config = categoryColors[key];
+                if (config.code && aboutValue === config.code) {
+                    applyColor = config.color;
+                    break;
+                } else if (config.range) {
+                    if (aboutValue >= config.range[0] && aboutValue <= config.range[1]) {
+                        applyColor = config.color;
+                        break;
+                    }
+                }
+            }
+        } else {
+            // Для конкретной категории, например "Мемы", "Фонды" и т.д.
+            const config = categoryColors[btnLabel];
+            if (config) {
+                if (config.code && aboutValue === config.code) {
+                    applyColor = config.color;
+                } else if (config.range) {
+                    if (aboutValue >= config.range[0] && aboutValue <= config.range[1]) {
+                        applyColor = config.color;
+                    }
+                }
+            }
+        }
+
+        if (applyColor) {
+            row.style.backgroundColor = applyColor;
+        }
+    }
+}
+
+// Обработчики для кнопок категорий
+function setupCategoryButtons() {
+    const buttonIds = [
+        { id: "btn-all-trended", label: "Все трендовые" },
+        { id: "btn-fonds", label: "Фонды" },
+        { id: "btn-memes", label: "Мемы" },
+        { id: "btn-musk", label: "Маск" },
+        { id: "btn-ai", label: "Ai" },
+        { id: "btn-infra", label: "Infrastructure" },
+        { id: "btn-depin", label: "dePin" },
+        { id: "btn-gamefi", label: "GameFi" },
+        { id: "btn-rwa", label: "RWA" },
+        { id: "btn-other", label: "Other trended" }
+    ];
+
+    buttonIds.forEach(item => {
+        const btn = document.getElementById(item.id);
+        if (btn) {
+            btn.addEventListener('click', () => colorByCategory(item.label));
+        }
+    });
+}
+
 // Функция для извлечения списка coin_id из таблицы
 function getTableCoinIds() {
     const table = document.getElementById('cryptoTable');
@@ -300,11 +387,8 @@ function toggleFavorite(coinId, currentVal) {
 
 window.onload = function() {
     console.log("main.js загружен");
-    // Привяжите обработчик для кнопки трендовых
-    const trendButton = document.getElementById('trend-button');
-    if (trendButton) {
-        trendButton.addEventListener('click', colorTrendCoins);
-    }
+    // Обработка кнопок категорий
+    setupCategoryButtons();
     // Обработчик для закрытия модального окна AI аналитики
     document.getElementById('close-modal').addEventListener('click', closeModal);
     // Обработчики для модального окна фильтров
