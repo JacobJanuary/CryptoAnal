@@ -1,3 +1,170 @@
+// Настраиваем сопоставление категорий и цветов
+const categoryColors = {
+    "Фонды": { code: 1, color: "#F0FFF0" },
+    "Мемы": { code: 2, color: "#FFF0F5" },
+    "Маск": { code: 3, color: "#FFFACD" },
+    "Ai": { code: 4, color: "#E6E6FA" },
+    "Infrastructure": { code: 5, color: "#F0FFFF" },
+    "dePin": { code: 6, color: "#F5F5DC" },
+    "GameFi": { code: 7, color: "#FAF0E6" },
+    "RWA": { code: 8, color: "#FFE4E1" },
+    "Other trended": { range: [9, 18], color: "#F8F8FF" }
+};
+
+// Функция для раскраски строк по категории
+function colorByCategory(btnLabel) {
+    const table = document.getElementById('cryptoTable');
+    const rows = table.tBodies[0].rows;
+
+    // Сбрасываем предыдущие стили
+    for (let row of rows) {
+        row.style.backgroundColor = "";
+    }
+
+    console.log("colorByCategory вызывается для кнопки:", btnLabel);
+
+    for (let row of rows) {
+        const coinId = row.getAttribute('data-coin-id');
+        const aboutStr = row.getAttribute("data-coin-about");
+        const aboutValue = parseInt(aboutStr);
+        console.log(`Строка coin_id=${coinId}, about_what=${aboutStr}`);
+        if (isNaN(aboutValue)) {
+            console.log(`Невозможно распарсить about_what для coin_id=${coinId}`);
+            continue;
+        }
+
+        let applyColor = null;
+        // Получаем конфигурацию для данной кнопки
+        const config = categoryColors[btnLabel];
+        if (!config) {
+            console.log(`Нет конфигурации для категории: ${btnLabel}`);
+        } else {
+            if (config.code !== undefined) {
+                if (aboutValue === config.code) {
+                    applyColor = config.color;
+                }
+            } else if (config.range) {
+                if (aboutValue >= config.range[0] && aboutValue <= config.range[1]) {
+                    applyColor = config.color;
+                }
+            }
+        }
+
+        if (applyColor) {
+            console.log(`Применяю цвет ${applyColor} для coin_id ${coinId}`);
+            row.style.backgroundColor = applyColor;
+        } else {
+            console.log(`Для coin_id ${coinId} категория about_what=${aboutValue} не соответствует ${btnLabel}`);
+        }
+    }
+}
+
+// Функция для настройки кнопок категорий
+function setupCategoryButtons() {
+    const buttons = [
+        { id: "btn-all-trended", label: "Все трендовые" },
+        { id: "btn-fonds", label: "Фонды" },
+        { id: "btn-memes", label: "Мемы" },
+        { id: "btn-musk", label: "Маск" },
+        { id: "btn-ai", label: "Ai" },
+        { id: "btn-infra", label: "Infrastructure" },
+        { id: "btn-depin", label: "dePin" },
+        { id: "btn-gamefi", label: "GameFi" },
+        { id: "btn-rwa", label: "RWA" },
+        { id: "btn-other", label: "Other trended" }
+    ];
+    buttons.forEach(item => {
+        const btn = document.getElementById(item.id);
+        if (btn) {
+            btn.addEventListener('click', () => {
+                console.log(`Нажата кнопка ${item.label}`);
+                // Если нажата кнопка "Все трендовые", вызываем colorTrendCoins()
+                if (item.label === "Все трендовые") {
+                    colorTrendCoins();
+                } else {
+                    colorByCategory(item.label);
+                }
+            });
+        }
+    });
+}
+
+
+// Функция для получения списка coin_id из таблицы
+function getTableCoinIds() {
+    const table = document.getElementById('cryptoTable');
+    const rows = table.tBodies[0].rows;
+    const coinIds = [];
+    for (let row of rows) {
+        const coinId = row.getAttribute('data-coin-id');
+        if (coinId) {
+            coinIds.push(coinId);
+        }
+    }
+    return coinIds;
+}
+
+// Функция для раскраски трендовых монет отправляя список coin_id на сервер
+function colorTrendCoins() {
+    const coinIds = getTableCoinIds();
+    console.log("Отправляем следующие coin_id для тренда:", coinIds);
+    fetch('/trend_coins', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ coin_ids: coinIds })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Ошибка сервера: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.error) {
+            alert("Ошибка: " + data.error);
+            return;
+        }
+        const trends = data.trends; // Ожидаем массив объектов с { coin_id, about_what }
+        console.log("Получены тренды:", trends);
+
+        // Проходим по строкам таблицы и раскрашиваем
+        const table = document.getElementById('cryptoTable');
+        const rows = table.tBodies[0].rows;
+        for (let row of rows) {
+            const coinId = row.getAttribute('data-coin-id');
+            // Найти объект тренда для этого coinId
+            const trendObj = trends.find(obj => obj.coin_id === coinId);
+            if (trendObj) {
+                let applyColor = null;
+                const aboutValue = trendObj.about_what;
+                // Для кнопки "Все трендовые" применим цвет исходя из о том, какая категория является приоритетной
+                // Здесь перебираем всё сопоставление
+                for (const key in categoryColors) {
+                    const config = categoryColors[key];
+                    if (config.code && aboutValue === config.code) {
+                        applyColor = config.color;
+                        break;
+                    } else if (config.range) {
+                        if (aboutValue >= config.range[0] && aboutValue <= config.range[1]) {
+                            applyColor = config.color;
+                            break;
+                        }
+                    }
+                }
+                if (applyColor) {
+                    row.style.backgroundColor = applyColor;
+                }
+            }
+        }
+    })
+    .catch(error => {
+        console.error("Ошибка при получении трендовых монет:", error);
+        alert("Ошибка при получении трендовых монет: " + error.message);
+    });
+}
+
 // Функция установки cookie (на случай, если потребуется fallback, можно оставить)
 function setCookie(name, value, days) {
     const expires = days ? "; expires=" + new Date(Date.now() + days*864e5).toUTCString() : "";
@@ -243,6 +410,8 @@ function toggleFavorite(coinId, currentVal) {
 
 window.onload = function() {
     console.log("main.js загружен");
+    // Обработка кнопок категорий
+    setupCategoryButtons();
     // Обработчик для закрытия модального окна AI аналитики
     document.getElementById('close-modal').addEventListener('click', closeModal);
     // Обработчики для модального окна фильтров

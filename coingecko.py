@@ -20,6 +20,7 @@ app.config['MYSQL_DB'] = os.getenv("MYSQL_DATABASE", "crypto_db")
 
 mysql = MySQL(app)
 
+
 # Получение аналитики с помощью API Grok
 def get_grok_analytics(name, symbol):
     if not XAI_API_KEY:
@@ -78,6 +79,7 @@ def get_grok_invest(name, symbol):
         traceback.print_exc()
         return {"error": str(e)}
 
+
 # Пользовательский фильтр для форматирования объема
 @app.template_filter('format_volume')
 def format_volume(value):
@@ -85,6 +87,8 @@ def format_volume(value):
         vol_str = f"${value / 1_000_000:.2f}".replace('.', ',')
         return f"{vol_str} млн"
     return "N/A"
+
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     try:
@@ -100,7 +104,8 @@ def index():
             "price_change_min": 0,
             "market_cap_rank": None
         }
-        cur.execute("SELECT vol_min, growth6h, growth1h, price_change_max, price_change_min, market_cap_rank FROM filter_settings WHERE id = 1")
+        cur.execute(
+            "SELECT vol_min, growth6h, growth1h, price_change_max, price_change_min, market_cap_rank FROM filter_settings WHERE id = 1")
         row = cur.fetchone()
         if row:
             filters = {
@@ -124,6 +129,23 @@ def index():
         crypto_data = [dict(zip(col_names, row)) for row in rows]
         cur.close()
 
+        # Дополнительный запрос: для всех coin_id получить значение about_what из таблиц coin_category_relation и CG_Categories
+        if crypto_data:
+            coin_ids = [coin['coin_id'] for coin in crypto_data]
+            format_str = ','.join(['%s'] * len(coin_ids))
+            cur = mysql.connection.cursor()
+            cur.execute(f"""
+                        SELECT ccr.coin_id, MIN(cc.about_what) AS about_what
+                        FROM coin_category_relation ccr
+                        JOIN CG_Categories cc ON ccr.category_id = cc.category_id
+                        WHERE ccr.coin_id IN ({format_str})
+                        GROUP BY ccr.coin_id
+                    """, tuple(coin_ids))
+            mapping = {row[0]: row[1] for row in cur.fetchall()}
+            cur.close()
+            # Объединяем данные с результатом mapping; если для монеты нет значения, оставляем пустую строку
+            for coin in crypto_data:
+                coin['about_what'] = mapping.get(coin['coin_id'], "")
         # Если POST-запрос для аналитики и инвестиций
         if request.method == "POST":
             name = request.form.get("name")
@@ -268,6 +290,40 @@ def save_filters():
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+@app.route("/trend_coins", methods=["POST"])
+def trend_coins():
+    try:
+        data = request.get_json()
+        coin_ids = data.get("coin_ids", [])
+        if not coin_ids:
+            return jsonify({"trends": []})
+
+        cur = mysql.connection.cursor()
+        # Формируем строку параметров для оператора IN
+        format_strings = ','.join(['%s'] * len(coin_ids))
+        query = f"""
+            WITH trend_data AS (
+              SELECT 
+                ccr.coin_id,
+                MIN(cc.about_what) AS about_what
+              FROM coin_category_relation ccr
+              JOIN CG_Categories cc ON ccr.category_id = cc.category_id
+              WHERE cc.about_what <> 0
+                AND ccr.coin_id IN ({format_strings})
+              GROUP BY ccr.coin_id
+            )
+            SELECT coin_id, about_what FROM trend_data;
+        """
+        cur.execute(query, tuple(coin_ids))
+        rows = cur.fetchall()
+        trends = [{"coin_id": row[0], "about_what": row[1]} for row in rows]
+        cur.close()
+        return jsonify({"trends": trends})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(debug=True)
