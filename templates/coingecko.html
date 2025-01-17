@@ -31,7 +31,7 @@
             <tbody>
             {% for crypto in crypto_data %}
                 <tr data-coin-id="{{ crypto.coin_id }}"
-                    data-coin-about="{{ crypto.about_what }}"
+                    data-about-min="{{ crypto.min_about }}">
                     data-categories="{{ crypto.categories_str }}">
                     <td>{{ crypto.name }} ({{ crypto.symbol }})</td>
                     <td>{{ crypto.market_cap_rank }}</td>

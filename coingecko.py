@@ -154,6 +154,40 @@ def index():
                     # Сформируем строку "Cat1, Cat2, Cat3"
                     coin['categories_str'] = ", ".join(categories_list)
 
+                #rev1
+                format_str = ','.join(['%s'] * len(coin_ids))
+                cur = mysql.connection.cursor()
+                # В этом запросе мы выбираем минимальное (и, следовательно, самую "важную") неравную 0 категорию
+                # Если категория = 0, она исключается, и монета не считается "трендовой"
+                query = f"""
+                            SELECT
+                              ccr.coin_id,
+                              MIN(cc.about_what) AS min_about
+                            FROM coin_category_relation ccr
+                            JOIN CG_Categories cc ON ccr.category_id = cc.category_id
+                            WHERE ccr.coin_id IN ({format_str})
+                              AND cc.about_what <> 0
+                            GROUP BY ccr.coin_id
+                        """
+                cur.execute(query, tuple(coin_ids))
+                rows = cur.fetchall()  # [(coin_id, min_about_what), ...]
+                cur.close()
+
+                # Построим mapping coin_id -> min_about_what
+                from collections import defaultdict
+                about_map = {}
+                for r in rows:
+                    c_id = r[0]
+                    min_about = r[1]
+                    about_map[c_id] = min_about
+
+                # Для каждой монеты запишем min_about_what (или 0/None, если нет)
+                for coin in crypto_data:
+                    c_id = coin['coin_id']
+                    coin['min_about'] = about_map.get(c_id, 0)  # или None
+
+                #end rev1
+
         # Если POST-запрос для аналитики и инвестиций
         if request.method == "POST":
             name = request.form.get("name")

@@ -1,3 +1,16 @@
+// Настраиваем соответствие about_what -> цвет
+const categoryColors = {
+    "Фонды": { code: 1, color: "#F0FFF0" },
+    "Мемы": { code: 2, color: "#FFF0F5" },
+    "Маск": { code: 3, color: "#FFFACD" },
+    "Ai": { code: 4, color: "#E6E6FA" },
+    "Infrastructure": { code: 5, color: "#F0FFFF" },
+    "dePin": { code: 6, color: "#F5F5DC" },
+    "GameFi": { code: 7, color: "#FAF0E6" },
+    "RWA": { code: 8, color: "#FFE4E1" },
+    "Other trended": { range: [9, 18], color: "#F8F8FF" }
+};
+
 let tooltipDiv = null;
 
 function showCategoryTooltip(event) {
@@ -27,6 +40,36 @@ function moveCategoryTooltip(event) {
 
 function hideCategoryTooltip() {
     tooltipDiv.style.display = 'none';
+}
+
+// Функция для автоматической раскраски при загрузке
+function colorTrendedOnLoad() {
+    const table = document.getElementById('cryptoTable');
+    if (!table) return;
+    const rows = table.tBodies[0].rows;
+
+    for (let row of rows) {
+        const aboutVal = parseInt(row.getAttribute('data-about-min')) || 0;
+        if (aboutVal !== 0) {
+            // Ищем соответствующий цвет
+            let colorToApply = null;
+            for (const key in categoryColors) {
+                const cfg = categoryColors[key];
+                if (cfg.code && cfg.code === aboutVal) {
+                    colorToApply = cfg.color;
+                    break;
+                } else if (cfg.range) {
+                    if (aboutVal >= cfg.range[0] && aboutVal <= cfg.range[1]) {
+                        colorToApply = cfg.color;
+                        break;
+                    }
+                }
+            }
+            if (colorToApply) {
+                row.style.backgroundColor = colorToApply;
+            }
+        }
+    }
 }
 
 // Навешиваем обработчики на каждую строку таблицы
@@ -310,6 +353,8 @@ window.onload = function() {
             sortTable(index, type);
         });
     });
+    // Сначала раскрашиваем
+    colorTrendedOnLoad();
     // Инициализируем tooltip
     setupCategoryTooltips();
 };
