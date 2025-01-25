@@ -282,7 +282,6 @@ def update_coin_categories(data):
             cursor.close()
             conn.close()
 
-
 def get_coin_ids_for_update():
     """
     Возвращает список coin_id из таблицы coin_gesco_coins, у которых поле description_en не пустое или не NULL.
