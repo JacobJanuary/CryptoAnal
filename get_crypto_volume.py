@@ -127,6 +127,14 @@ try:
             ''', (coin_id,))
             deleted_count_volume_stats += cursor.rowcount
 
+            # Удаляем записи из coin_category_relation
+            cursor.execute('''
+                DELETE FROM coin_category_relation
+                WHERE coin_id = %s
+            ''', (coin_id,))
+            deleted_count_volume_stats += cursor.rowcount
+
+
             # Удаляем записи из cryptocurrencies
             cursor.execute('''
                 DELETE FROM cryptocurrencies
