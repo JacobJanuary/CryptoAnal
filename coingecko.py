@@ -333,5 +333,11 @@ def save_filters():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+@app.template_filter('safe_round')
+def safe_round(value, precision=2):
+    if value is None:
+        return "N/A"
+    return round(value, precision)
+
 if __name__ == "__main__":
     app.run(debug=True)

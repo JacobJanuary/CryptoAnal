@@ -7,6 +7,9 @@
     <script src="{{ url_for('static', filename='main.js') }}"></script>
 </head>
 <body>
+<button id="hide-non-trended-btn">Убрать все, что не в тренде</button>
+<button onclick="showAllCoins()">Показать все</button>
+
 <!-- Кнопка для открытия модального окна настроек фильтров -->
 <button id="open-filters-btn">Customise</button>
 
@@ -36,9 +39,9 @@
                     <td>{{ crypto.name }} ({{ crypto.symbol }})</td>
                     <td>{{ crypto.market_cap_rank }}</td>
                     <td>{{ crypto.vol_latest|format_volume }}</td>
-                    <td>{{ crypto.vol_growth_6h|round(2) }}%</td>
-                    <td>{{ crypto.vol_growth_1h|round(2) }}%</td>
-                    <td>{{ crypto.price_change_6h|round(2) }}%</td>
+                    <td>{{ crypto.vol_growth_6h|safe_round(2) }}%</td>
+                    <td>{{ crypto.vol_growth_1h|safe_round(2) }}%</td>
+                    <td>{{ crypto.price_change_6h|safe_round(2) }}%</td>
                     <td>{{ crypto.current_price }}</td>
                     <td>
                         <a href="https://www.coingecko.com/en/coins/{{ crypto.coin_id }}" target="_blank">

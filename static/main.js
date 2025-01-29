@@ -8,8 +8,33 @@ const categoryColors = {
     "dePin": { code: 6, color: "#F5F5DC" },
     "GameFi": { code: 7, color: "#FAF0E6" },
     "RWA": { code: 8, color: "#FFE4E1" },
+    "USA":{ code: 20, color: "#39E75F" },
     "Other trended": { range: [9, 18], color: "#F8F8FF" }
 };
+
+function hideNonTrended() {
+    const table = document.getElementById('cryptoTable');
+    if (!table) return;
+    const rows = table.tBodies[0].rows;
+
+    for (let row of rows) {
+        const aboutVal = parseInt(row.getAttribute('data-about-min')) || 0;
+        if (aboutVal === 0) {
+            // Монета не в тренде — скрываем строку
+            row.style.display = 'none';
+        }
+    }
+}
+
+function showAllCoins() {
+    const table = document.getElementById('cryptoTable');
+    if (!table) return;
+    const rows = table.tBodies[0].rows;
+    for (let row of rows) {
+        row.style.display = '';
+    }
+}
+
 
 let tooltipDiv = null;
 
@@ -357,4 +382,10 @@ window.onload = function() {
     colorTrendedOnLoad();
     // Инициализируем tooltip
     setupCategoryTooltips();
+
+    // Кнопка для скрытия не-трендовых
+    const hideBtn = document.getElementById('hide-non-trended-btn');
+    if (hideBtn) {
+        hideBtn.addEventListener('click', hideNonTrended);
+    }
 };
