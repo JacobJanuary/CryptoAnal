@@ -32,6 +32,25 @@ cpu_samples = []
 # Флаг для остановки потока измерения загрузки CPU
 stop_cpu_sampling = threading.Event()
 
+def remove_coin_from_db(coin_id):
+    """
+    Удаляет монету из таблицы coin_gesco_coins по её идентификатору (id).
+    Возвращает True, если удаление прошло успешно.
+    """
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM coin_gesco_coins WHERE id=%s", (coin_id,))
+        conn.commit()
+        deleted_rows = cursor.rowcount
+        return deleted_rows > 0
+    except mysql.connector.Error as e:
+        print(f"Ошибка при удалении монеты {coin_id}: {e}")
+        return False
+    finally:
+        if 'conn' in locals() and conn.is_connected():
+            cursor.close()
+            conn.close()
 
 def cpu_sampling():
     """
@@ -221,7 +240,9 @@ def process_batch(batch, batch_number):
     for coin_id in batch:
         market_data = coins_data.get(coin_id.lower())
         if not market_data:
-            print(f"Батч {batch_number}: нет данных по монете {coin_id}")
+            # Нет данных => удаляем монету coin_id из coin_gesco_coins
+            removed = remove_coin_from_db(coin_id)
+            print(f"Батч {batch_number}: нет данных для {coin_id}, монета удалена: {removed}")
             continue
         # Обновляем основную таблицу
         if update_coin_in_db(coin_id, market_data):
