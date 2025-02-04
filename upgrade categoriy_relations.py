@@ -117,7 +117,7 @@ def get_coin_ids_for_update():
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
         # Выбираем все записи, где description_en  NULL иои пустое (после обрезки пробелов)
-        query = "SELECT `id` FROM `coin_gesco_coins"
+        query = "SELECT `id` FROM `coin_gesco_coins`"
         cursor.execute(query)
         rows = cursor.fetchall()
         coin_ids = [row[0] for row in rows]
