@@ -9,6 +9,8 @@
 <body>
 <button id="hide-non-trended-btn">Убрать все, что не в тренде</button>
 <button onclick="showAllCoins()">Показать все</button>
+<!-- Где-то в coingecko.html, рядом с другими кнопками -->
+<button onclick="window.location.href='/favourites'">Показать избранные</button>
 
 <!-- Кнопка для открытия модального окна настроек фильтров -->
 <button id="open-filters-btn">Customise</button>
@@ -56,7 +58,7 @@
                     </td>
                     <td>
                         <button id="favorite-button-{{ crypto.coin_id }}"
-                                onclick="toggleFavorite('{{ crypto.coin_id }}', {{ 'true' if crypto.isFavourites else 'false' }})">
+                                onclick="toggleFavorite('{{ crypto.coin_id }}', {{ 1 if crypto.isFavourites else 0 }})">
                             {% if crypto.isFavourites %}
                                 Удалить
                             {% else %}

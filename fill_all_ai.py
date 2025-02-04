@@ -136,9 +136,10 @@ def main():
             ai_text = c.get("AI_text")
             ai_invest = c.get("AI_invest")
             min_about = trend_map.get(cid, 0)
+            isFavourites = c.get('isFavourites')
 
             # не трендовая - пропускаем
-            if min_about == 0:
+            if min_about == 0 and not isFavourites:
                 continue
 
             # нужно ли обновить

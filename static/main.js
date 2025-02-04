@@ -362,6 +362,86 @@ function toggleFavorite(coinId, currentVal) {
     });
 }
 
+// Функция для загрузки подробной информации по монете и отображения в модальном окне
+function showCoinDetails(coinId) {
+    // Получаем модальное окно (можно переиспользовать существующее окно модального окна)
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalContent = document.getElementById('modal-content-data');
+    const modalLoading = document.getElementById('modal-loading');
+
+    // Очищаем содержимое модального окна и показываем индикатор загрузки
+    modalTitle.textContent = "Загрузка данных...";
+    modalContent.innerHTML = "";
+    modal.style.display = 'block';
+    modalLoading.style.display = 'block';
+    modalContent.style.display = 'none';
+
+    // Выполняем AJAX-запрос к маршруту /coin_details/<coinId>
+    fetch(`/coin_details/${coinId}`)
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(errData => {
+                throw new Error(errData.error || `Ошибка: ${response.status}`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        // Заполняем модальное окно подробной информацией
+        // Для длинных полей (description_en, AI_text, AI_invest) покажем только первые 200 символов с кнопкой ">" для разворачивания
+        function collapseText(text, limit = 200) {
+            if (!text) return "N/A";
+            if (text.length <= limit) return text;
+            // возвращаем обрезанную версию и кнопку ">"
+            return `<span class="collapsed-text">${text.substring(0, limit)}...</span>
+                    <button class="expand-btn" onclick="toggleExpand(this)">></button>
+                    <span class="full-text" style="display:none;">${text}</span>`;
+        }
+
+        let html = `
+            <h3>${data.name} (${data.symbol})</h3>
+            <p><strong>Market Cap Rank:</strong> ${data.market_cap_rank || "N/A"}</p>
+            <p><strong>Description:</strong> ${collapseText(data.description_en)}</p>
+            <p><strong>All-Time High (ATH):</strong> ${data.ath_usd || "N/A"} USD, 
+               ${data.ath_change_percentage_usd ? data.ath_change_percentage_usd.toFixed(2) + "%" : "N/A"}, 
+               ${data.ath_date_usd ? data.ath_date_usd : "N/A"}</p>
+            <p><strong>All-Time Low (ATL):</strong> ${data.atl_usd || "N/A"} USD, 
+               ${data.atl_change_percentage_usd ? data.atl_change_percentage_usd.toFixed(2) + "%" : "N/A"}, 
+               ${data.atl_date_usd ? data.atl_date_usd : "N/A"}</p>
+            <p><strong>Total Volume (USD):</strong> ${data.total_volume_usd || "N/A"}</p>
+            <p><strong>24h High:</strong> ${data.high_24h_usd || "N/A"} USD</p>
+            <p><strong>24h Low:</strong> ${data.low_24h_usd || "N/A"} USD</p>
+            <p><strong>Watchlist Users:</strong> ${data.watchlist_portfolio_users || "N/A"}</p>
+            <p><strong>AI Analytics:</strong> ${collapseText(formatAnalyticsContent(data.AI_text))}</p>
+            <p><strong>AI Invest:</strong> ${collapseText(formatAnalyticsContent(data.AI_invest))}</p>
+        `;
+        modalTitle.textContent = "Подробная информация";
+        modalContent.innerHTML = html;
+        modalLoading.style.display = 'none';
+        modalContent.style.display = 'block';
+    })
+    .catch(error => {
+        alert(`Ошибка загрузки данных: ${error.message}`);
+        modal.style.display = 'none';
+    });
+}
+
+// Функция для переключения развёрнутого/свернутого вида длинного текста
+function toggleExpand(button) {
+    const fullTextSpan = button.nextElementSibling;
+    const collapsedSpan = button.previousElementSibling;
+    if (fullTextSpan.style.display === 'none') {
+        fullTextSpan.style.display = 'inline';
+        collapsedSpan.style.display = 'none';
+        button.textContent = "<";
+    } else {
+        fullTextSpan.style.display = 'none';
+        collapsedSpan.style.display = 'inline';
+        button.textContent = ">";
+    }
+}
+
 window.onload = function() {
     console.log("main.js загружен");
     // Обработчик для закрытия модального окна AI аналитики

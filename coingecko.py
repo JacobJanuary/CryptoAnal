@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify
 from flask_caching import Cache
 from flask_mysqldb import MySQL
+import mysql.connector as mc
 
 app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'simple'})
@@ -19,6 +20,15 @@ app.config['MYSQL_PASSWORD'] = os.getenv("MYSQL_PASSWORD", "password")
 app.config['MYSQL_DB'] = os.getenv("MYSQL_DATABASE", "crypto_db")
 
 mysql = MySQL(app)
+
+# Если вы используете mysql.connector в каких-то местах, можно сформировать
+# db_config для удобного использования:
+db_config = {
+    'host': app.config['MYSQL_HOST'],
+    'user': app.config['MYSQL_USER'],
+    'password': app.config['MYSQL_PASSWORD'],
+    'database': app.config['MYSQL_DB']
+}
 
 # Получение аналитики с помощью API Grok
 def get_grok_analytics(name, symbol):
@@ -338,6 +348,131 @@ def safe_round(value, precision=2):
     if value is None:
         return "N/A"
     return round(value, precision)
+
+# Новый маршрут «Избранные»
+@app.route("/favourites")
+def favourites():
+    """
+    Отображает страницу с избранными монетами (isFavourites=1) с возможностью сортировки.
+    Поддерживаемые поля для сортировки: name, market_cap_rank, price_change_percentage_24h.
+    Порядок сортировки: asc, desc.
+    """
+    try:
+        # Получаем параметры сортировки из URL
+        sort_by = request.args.get('sort_by', 'market_cap_rank')  # по умолчанию сортировка по рангу
+        order = request.args.get('order', 'asc')  # по умолчанию по возрастанию
+
+        # Определяем допустимые поля для сортировки
+        valid_sort_fields = {
+            'name': 'c.name',
+            'market_cap_rank': 'c.market_cap_rank',
+            'price_change_percentage_24h': 'c.price_change_percentage_24h'
+        }
+
+        # Проверяем, является ли sort_by допустимым
+        if sort_by not in valid_sort_fields:
+            sort_by = 'market_cap_rank'  # если нет, устанавливаем значение по умолчанию
+
+        # Проверяем, является ли order допустимым
+        if order not in ['asc', 'desc']:
+            order = 'asc'  # если нет, устанавливаем значение по умолчанию
+
+        # Формируем ORDER BY часть запроса
+        order_by_clause = f"ORDER BY {valid_sort_fields[sort_by]} {order.upper()}"
+
+        # Подключаемся через mysql.connector напрямую
+        # Подключаемся через mysql.connector (используем 'mc', а не 'mysql_db')
+        conn = mc.connect(**db_config)
+        cursor = conn.cursor(dictionary=True)
+
+        # SQL-запрос с динамической сортировкой
+        query = f"""
+            SELECT c.id,
+                   c.name,
+                   c.symbol,
+                   c.market_cap_rank,
+                   c.current_price_usd,
+                   c.price_change_percentage_24h,
+                   (
+                     SELECT cc.name
+                     FROM coin_category_relation ccr
+                     JOIN CG_Categories cc ON ccr.category_id = cc.category_id
+                     WHERE ccr.coin_id = c.id
+                     ORDER BY cc.Weight ASC
+                     LIMIT 1
+                   ) AS main_category
+            FROM coin_gesco_coins c
+            WHERE c.isFavourites = 1
+            {order_by_clause}
+        """
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        # Определяем противоположный порядок для следующего клика
+        opposite_order = 'desc' if order == 'asc' else 'asc'
+
+        return render_template("favourites.html", coins=rows, current_sort=sort_by, current_order=order,
+                               opposite_order=opposite_order)
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/coin_details/<coin_id>")
+def coin_details(coin_id):
+    """
+    Возвращает подробные данные по монете с идентификатором coin_id.
+    Данные берутся из таблицы coin_gecko_coins.
+    Ожидаемые поля:
+      - name, symbol
+      - description_en (можно вернуть обрезанную версию и полный текст)
+      - market_cap_rank
+      - ath_usd, ath_change_percentage_usd, ath_date_usd
+      - atl_usd, atl_change_percentage_usd, atl_date_usd
+      - total_volume_usd
+      - high_24h_usd, low_24h_usd
+      - watchlist_portfolio_users
+      - AI_text, AI_invest
+    """
+    try:
+        conn = mc.connect(**db_config)
+        cursor = conn.cursor(dictionary=True)
+        query = """
+            SELECT 
+              id,
+              name,
+              symbol,
+              description_en,
+              market_cap_rank,
+              ath_usd,
+              ath_change_percentage_usd,
+              ath_date_usd,
+              atl_usd,
+              atl_change_percentage_usd,
+              atl_date_usd,
+              total_volume_usd,
+              high_24h_usd,
+              low_24h_usd,
+              watchlist_portfolio_users,
+              AI_text,
+              AI_invest
+            FROM coin_gesco_coins
+            WHERE id = %s
+        """
+        cursor.execute(query, (coin_id,))
+        coin = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if not coin:
+            return jsonify({"error": "Монета не найдена"}), 404
+
+        return jsonify(coin)
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)

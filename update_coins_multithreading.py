@@ -25,7 +25,7 @@ COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY", "")
 COINGECKO_URL = "https://pro-api.coingecko.com/api/v3/simple/price"
 
 # Максимальное количество потоков
-MAX_WORKERS = 15
+MAX_WORKERS = 20
 
 # Глобальная коллекция замеров загрузки CPU
 cpu_samples = []

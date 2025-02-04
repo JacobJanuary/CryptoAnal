@@ -208,3 +208,17 @@ button:hover {
     border-radius: 4px;
     cursor: pointer;
 }
+
+.collapsed-text {
+    /* Стили для свернутой версии текста */
+}
+.full-text {
+    /* Стили для полного текста */
+}
+.expand-btn {
+    background: none;
+    border: none;
+    color: blue;
+    cursor: pointer;
+    font-weight: bold;
+}
