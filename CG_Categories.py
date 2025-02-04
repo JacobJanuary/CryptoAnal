@@ -76,7 +76,7 @@ def save_categories_to_db(categories):
 
         # Запрос для вставки категории (Weight по умолчанию 999)
         insert_query = """
-            INSERT INTO CG_Categories (category_id, name, Weigth, about_what)
+            INSERT INTO CG_Categories (category_id, name, Weight, about_what)
             VALUES (%s, %s, 999, 0)
         """
 
