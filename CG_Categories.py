@@ -1,6 +1,7 @@
+import os
+import traceback
 import requests
 import mysql.connector
-import os
 from dotenv import load_dotenv
 
 # Загружаем переменные окружения из .env
@@ -11,16 +12,25 @@ COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY")
 if not COINGECKO_API_KEY:
     raise ValueError("Необходимо установить переменную окружения COINGECKO_API_KEY")
 
-# URL для получения списка категорий (только ID и Name)
+# URL для получения базового списка категорий (только category_id и name)
 CATEGORIES_LIST_URL = "https://pro-api.coingecko.com/api/v3/coins/categories/list"
 
-# URL для получения списка категорий с деталями (market_cap_desc)
+# URL для получения детализированного списка категорий (с рыночной капитализацией)
 CATEGORIES_DETAILED_URL = "https://pro-api.coingecko.com/api/v3/coins/categories?order=market_cap_desc"
 
 headers = {
     "accept": "application/json",
     "x-cg-pro-api-key": COINGECKO_API_KEY
 }
+
+# Глобальная конфигурация подключения к БД
+db_config = {
+    'host': os.getenv("MYSQL_HOST", "localhost"),
+    'user': os.getenv("MYSQL_USER", "root"),
+    'password': os.getenv("MYSQL_PASSWORD", "password"),
+    'database': os.getenv("MYSQL_DATABASE", "crypto_db")
+}
+
 
 def fetch_categories_list():
     """
@@ -34,11 +44,11 @@ def fetch_categories_list():
         print(f"Ошибка при запросе к CoinGecko API (fetch_categories_list): {e}")
         return []
 
+
 def fetch_categories_detailed():
     """
-    Получает детализированный список категорий,
-    отсортированный по убыванию market_cap.
-    Пример структуры для каждого элемента:
+    Получает детализированный список категорий, отсортированный по убыванию market_cap.
+    Каждый элемент – словарь с полями, например:
       {
         "id": "polkadot-ecosystem",
         "name": "Polkadot Ecosystem",
@@ -57,35 +67,21 @@ def fetch_categories_detailed():
 
 def save_categories_to_db(categories):
     """
-    Сохраняет список категорий (минимальные поля) в таблицу CG_Categories.
-    Перед вставкой проверяет, нет ли уже записи с таким category_id.
-    Возвращает количество новых категорий.
+    Сохраняет базовый список категорий (category_id, name) в таблицу CG_Categories.
+    Если категория с таким category_id уже существует, пропускает её.
+    Новым категориям присваивает Weight = 999 и about_what = 0.
+    Возвращает количество добавленных категорий.
     """
-    db_config = {
-        "host": os.getenv("MYSQL_HOST", "localhost"),
-        "user": os.getenv("MYSQL_USER", "root"),
-        "password": os.getenv("MYSQL_PASSWORD", "password"),
-        "database": os.getenv("MYSQL_DATABASE", "crypto_db")
-    }
-
     new_categories_count = 0
-
+    conn = None
     try:
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
-
-        # Запрос для вставки категории (Weight по умолчанию 999)
         insert_query = """
             INSERT INTO CG_Categories (category_id, name, Weight, about_what)
             VALUES (%s, %s, 999, 0)
         """
-
-        # Проверка существующей записи
-        select_query = """
-            SELECT category_id
-            FROM CG_Categories
-            WHERE category_id = %s
-        """
+        select_query = "SELECT category_id FROM CG_Categories WHERE category_id = %s"
 
         for category in categories:
             category_id = category.get("category_id")
@@ -102,91 +98,73 @@ def save_categories_to_db(categories):
         return new_categories_count
 
     except mysql.connector.Error as e:
-        print(f"Ошибка базы данных MySQL: {e}")
+        print(f"Ошибка базы данных MySQL при сохранении категорий: {e}")
         return 0
 
     finally:
-        if conn.is_connected():
+        if conn is not None and conn.is_connected():
             cursor.close()
             conn.close()
+
 
 def reset_all_weights_to_999():
     """
-    Ставит Weight=999 для всех категорий в таблице CG_Categories.
+    Сбрасывает Weight до 999 для всех категорий в таблице CG_Categories.
     """
-    db_config = {
-        "host": os.getenv("MYSQL_HOST", "localhost"),
-        "user": os.getenv("MYSQL_USER", "root"),
-        "password": os.getenv("MYSQL_PASSWORD", "password"),
-        "database": os.getenv("MYSQL_DATABASE", "crypto_db")
-    }
-
+    conn = None
     try:
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
-
         update_query = "UPDATE CG_Categories SET Weight = 999"
         cursor.execute(update_query)
         conn.commit()
-
-        print("Weight=999 проставлен для всех категорий.")
-
+        print("Weight = 999 проставлен для всех категорий.")
     except mysql.connector.Error as e:
-        print(f"Ошибка базы данных MySQL: {e}")
+        print(f"Ошибка базы данных MySQL при сбросе весов: {e}")
     finally:
-        if conn.is_connected():
+        if conn is not None and conn.is_connected():
             cursor.close()
             conn.close()
 
-def update_weights_by_market_cap():
-    """
-    1. Получаем детализированный список категорий,
-       отсортированный по убыванию market_cap.
-    2. Присваиваем Weight = 1 категории с самым большим market_cap,
-       Weight = 2 — следующей и т.д.
-    """
-    db_config = {
-        "host": os.getenv("MYSQL_HOST", "localhost"),
-        "user": os.getenv("MYSQL_USER", "root"),
-        "password": os.getenv("MYSQL_PASSWORD", "password"),
-        "database": os.getenv("MYSQL_DATABASE", "crypto_db")
-    }
 
+def update_weights_and_market_cap():
+    """
+    Получает детализированный список категорий (с рыночной капитализацией) и обновляет для каждой категории:
+      - Weight: присваивает 1 для категории с самым большим market_cap, 2 для следующей и т.д.
+      - market_cap: обновляет значение капитализации.
+    """
     categories_detailed = fetch_categories_detailed()
     if not categories_detailed:
         print("Не удалось получить детализированный список категорий (market_cap_desc).")
         return
 
+    conn = None
     try:
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
-
-        # Пробегаемся по категориям в порядке убывания market_cap
-        # i = 1 для первой (самый большой market_cap), i = 2 для второй и т.д.
         rank = 1
-        update_query = "UPDATE CG_Categories SET Weight = %s WHERE category_id = %s"
-
+        update_query = "UPDATE CG_Categories SET Weight = %s, market_cap = %s WHERE category_id = %s"
         for cat in categories_detailed:
-            cat_id = cat.get("id")  # В detailed-ответах поле называется "id"
-            if cat_id:
-                cursor.execute(update_query, (rank, cat_id))
+            cat_id = cat.get("id")  # В детализированном ответе поле называется "id"
+            market_cap = cat.get("market_cap")
+            if cat_id is not None and market_cap is not None:
+                cursor.execute(update_query, (rank, market_cap, cat_id))
                 rank += 1
-
         conn.commit()
-        print("Weight обновлён согласно рыночной капитализации (market_cap_desc).")
-
+        print("Weight и market_cap обновлены согласно рыночной капитализации.")
     except mysql.connector.Error as e:
-        print(f"Ошибка базы данных MySQL: {e}")
+        print(f"Ошибка базы данных MySQL при обновлении весов и market_cap: {e}")
     finally:
-        if conn.is_connected():
+        if conn is not None and conn.is_connected():
             cursor.close()
             conn.close()
 
+
 def main():
-    # 1. Получаем первоначальный список категорий (category_id, name)
+    # 1. Получаем базовый список категорий
     categories = fetch_categories_list()
     if not categories:
-        print("Не удалось получить базовый список категорий (list).")
+        print("Не удалось получить базовый список категорий.")
         return
 
     print(f"Получено {len(categories)} категорий от CoinGecko (list).")
@@ -195,11 +173,12 @@ def main():
     new_count = save_categories_to_db(categories)
     print(f"Добавлено новых категорий: {new_count}")
 
-    # 3. Присваиваем Weight = 999 всем категориям
+    # 3. Сбрасываем веса всех категорий до 999
     reset_all_weights_to_999()
 
-    # 4. Получаем детальные категории (с market_cap) и обновляем веса (Weight)
-    update_weights_by_market_cap()
+    # 4. Обновляем веса и капитализацию для всех категорий
+    update_weights_and_market_cap()
+
 
 if __name__ == "__main__":
     main()

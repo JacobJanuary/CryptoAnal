@@ -1,6 +1,7 @@
+import os
+import traceback
 import requests
 import mysql.connector
-import os
 import time
 from dotenv import load_dotenv
 from datetime import datetime
@@ -63,10 +64,10 @@ def update_coin_categories(data):
     """
     Обновляет связи монеты с категориями в таблице coin_category_relation.
     Для данной монеты:
-      - Удаляет старые связи,
-      - Затем для каждого элемента из data['categories']:
+      - Для каждого элемента из data['categories']:
             ищет в таблице CG_Categories запись по совпадению имени,
             если найдена, вставляет новую связь (coin_id, category_id).
+    Если для монеты уже существуют какие-либо связи, они не удаляются.
     """
     coin_id = data.get("id")
     if not coin_id:
@@ -75,18 +76,13 @@ def update_coin_categories(data):
 
     categories = data.get("categories", [])
     if not categories:
-        print("Для монеты нет категорий для обновления.")
+        print(f"Для монеты {coin_id} нет категорий для обновления.")
         return
 
     try:
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
 
-        # Удаляем старые связи для данной монеты
-        delete_query = "DELETE FROM coin_category_relation WHERE coin_id = %s"
-        cursor.execute(delete_query, (coin_id,))
-
-        # Для каждой категории, ищем category_id в CG_Categories по совпадению имени
         select_query = "SELECT category_id FROM CG_Categories WHERE name = %s"
         insert_query = "INSERT INTO coin_category_relation (coin_id, category_id) VALUES (%s, %s)"
 
@@ -102,22 +98,26 @@ def update_coin_categories(data):
 
         conn.commit()
     except mysql.connector.Error as e:
-        print(f"Ошибка обновления категорий для монеты {coin_id}: {e}")
+        print(f"Ошибка обновления категорий для монеты {coin_id}: {category_id} ({cat}) {e}")
     finally:
         if conn.is_connected():
             cursor.close()
             conn.close()
 
+
 def get_coin_ids_for_update():
     """
-    Возвращает список coin_id из таблицы coin_gesco_coins, у которых поле description_en не пустое или не NULL.
+    Возвращает список coin_id из таблицы coin_gesco_coins,
+    для которых еще не выбраны категории (т.е. отсутствуют записи в coin_category_relation).
     """
     coin_ids = []
     try:
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
-        # Выбираем все записи, где description_en  NULL иои пустое (после обрезки пробелов)
-        query = "SELECT `id` FROM `coin_gesco_coins`"
+        query = """
+            SELECT id FROM coin_gesco_coins
+            WHERE id NOT IN (SELECT DISTINCT coin_id FROM coin_category_relation)
+        """
         cursor.execute(query)
         rows = cursor.fetchall()
         coin_ids = [row[0] for row in rows]
@@ -130,21 +130,61 @@ def get_coin_ids_for_update():
     return coin_ids
 
 
-def main():
-    # Получаем список coin_id для обновления
-    coin_ids = get_coin_ids_for_update()
-    print(f"Найдено {len(coin_ids)} монет для обновления.")
+def remove_coin_from_db(coin_id):
+    """
+    Удаляет монету из таблицы coin_gesco_coins по coin_id.
+    Здесь не производится удаление связанных записей (удаление категорий убрано).
+    Возвращает True, если монета была удалена, иначе False.
+    """
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM coin_gesco_coins WHERE id = %s", (coin_id,))
+        conn.commit()
+        deleted_rows = cursor.rowcount
+        return deleted_rows > 0
+    except mysql.connector.Error as e:
+        print(f"Ошибка при удалении монеты {coin_id}: {e}")
+        return False
+    finally:
+        if 'conn' in locals() and conn.is_connected():
+            cursor.close()
+            conn.close()
 
-    # Для ограничения API до 30 запросов в минуту устанавливаем задержку 2 секунды между запросами
-    for coin_id in coin_ids:
-        print(f"\nОбработка монеты {coin_id}...")
-        coin_data = fetch_coin_details(coin_id)
-        if coin_data:
-            update_coin_categories(coin_data)
-        else:
-            print(f"Не удалось получить данные для монеты {coin_id}.")
-        # Задержка в 2 секунды для соблюдения лимита 30 запросов в минуту
-        #time.sleep(2)
+
+def main():
+    # Получаем список coin_id для обновления (монеты, у которых ещё не выбраны категории)
+    coin_ids = get_coin_ids_for_update()
+    print(f"Найдено {len(coin_ids)} монет для обновления категорий.")
+
+    # Используем пул потоков для параллельной обработки монет (2 потоков)
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = {executor.submit(process_coin, coin_id): coin_id for coin_id in coin_ids}
+        for future in as_completed(futures):
+            coin_id = futures[future]
+            try:
+                future.result()
+            except Exception as e:
+                print(f"Ошибка обработки монеты {coin_id}: {e}")
+
+
+def process_coin(coin_id):
+    """
+    Обрабатывает монету:
+      - Запрашивает данные через API CoinGecko.
+      - Если данные не получены, удаляет монету из базы.
+      - Если данные получены, обновляет связи категорий.
+    """
+    print(f"\nОбработка монеты {coin_id}...")
+    coin_data = fetch_coin_details(coin_id)
+    if not coin_data:
+        removed = remove_coin_from_db(coin_id)
+        print(f"Нет данных для монеты {coin_id} -> монета удалена: {removed}")
+        return
+
+    update_coin_categories(coin_data)
+    print(f"Монета {coin_id} успешно обновлена.")
 
 
 if __name__ == "__main__":
