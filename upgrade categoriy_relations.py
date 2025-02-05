@@ -59,14 +59,15 @@ def parse_datetime(dt_str):
     except Exception:
         return None
 
-
 def update_coin_categories(data):
     """
     Обновляет связи монеты с категориями в таблице coin_category_relation.
     Для данной монеты:
       - Для каждого элемента из data['categories']:
             ищет в таблице CG_Categories запись по совпадению имени,
-            если найдена, вставляет новую связь (coin_id, category_id).
+            если найдена, проверяет, существует ли уже связь (coin_id, category_id)
+            в таблице coin_category_relation.
+            Если связи ещё нет, вставляет новую связь (coin_id, category_id).
     Если для монеты уже существуют какие-либо связи, они не удаляются.
     """
     coin_id = data.get("id")
@@ -83,27 +84,34 @@ def update_coin_categories(data):
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
 
-        select_query = "SELECT category_id FROM CG_Categories WHERE name = %s"
+        select_cat_query = "SELECT category_id FROM CG_Categories WHERE name = %s"
+        # Новый запрос для проверки существования связи:
+        select_relation_query = "SELECT 1 FROM coin_category_relation WHERE coin_id = %s AND category_id = %s"
         insert_query = "INSERT INTO coin_category_relation (coin_id, category_id) VALUES (%s, %s)"
 
         for cat in categories:
-            cursor.execute(select_query, (cat,))
+            cursor.execute(select_cat_query, (cat,))
             row = cursor.fetchone()
             if row:
                 category_id = row[0]
-                cursor.execute(insert_query, (coin_id, category_id))
-                print(f"Добавлена связь: монета {coin_id} ↔ категория {category_id} ({cat})")
+                # Проверяем, существует ли связь (coin_id, category_id)
+                cursor.execute(select_relation_query, (coin_id, category_id))
+                relation_exists = cursor.fetchone()
+                if not relation_exists:
+                    cursor.execute(insert_query, (coin_id, category_id))
+                    print(f"Добавлена связь: монета {coin_id} ↔ категория {category_id} ({cat})")
+                else:
+                    print(f"Связь для монеты {coin_id} с категорией {category_id} ({cat}) уже существует.")
             else:
                 print(f"Не найдена категория с именем: {cat}")
 
         conn.commit()
     except mysql.connector.Error as e:
-        print(f"Ошибка обновления категорий для монеты {coin_id}: {category_id} ({cat}) {e}")
+        print(f"Ошибка обновления категорий для монеты {coin_id}: {e}")
     finally:
         if conn.is_connected():
             cursor.close()
             conn.close()
-
 
 def get_coin_ids_for_update():
     """
