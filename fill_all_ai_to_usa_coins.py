@@ -23,12 +23,14 @@ def get_grok_analytics(name, symbol):
             f"Что он делает, когда создан, кто в команде, какие перспективы, развитие, социальная активность. "
             f"Заходили ли в проект умные деньги, какие твои прогнозы по курсу токена на 2025 год."
         )
+        print(f"[get_grok_analytics] Отправляем запрос ИИ по монете {name} ({symbol})...")
         response = client.messages.create(
             model="grok-beta",
             max_tokens=128000,
             messages=[{"role": "user", "content": prompt}]
         )
         if response and isinstance(response.content[0].text, str):
+            print(f"[get_grok_analytics] Ответ ИИ получен по монете {name} ({symbol}).")
             return {"content": response.content[0].text}
         else:
             return {"error": "Unexpected response from API"}
@@ -43,12 +45,14 @@ def get_grok_invest(name, symbol):
     try:
         client = Anthropic(api_key=XAI_API_KEY, base_url="https://api.x.ai")
         prompt = f"Найди информацию какие фонды или Smart money инвестировали в проект {name} ({symbol})."
+        print(f"[get_grok_invest] Отправляем запрос ИИ по фондам для монеты {name} ({symbol})...")
         response = client.messages.create(
             model="grok-beta",
             max_tokens=128000,
             messages=[{"role": "user", "content": prompt}]
         )
         if response and isinstance(response.content[0].text, str):
+            print(f"[get_grok_invest] Ответ ИИ по фондам получен по монете {name} ({symbol}).")
             return {"content": response.content[0].text}
         else:
             return {"error": "Unexpected response from API"}
@@ -119,18 +123,22 @@ def main():
             ai_invest = coin.get("AI_invest")
             error_log = []
 
+            # Если нет AI_text, запрашиваем аналитику
             if not ai_text:
-                res_ana = get_grok_analytics(name, symbol)
-                if "error" in res_ana:
-                    error_log.append("Analytics error: " + res_ana["error"])
+                ana_result = get_grok_analytics(name, symbol)
+                if "error" in ana_result:
+                    error_log.append("Analytics error: " + ana_result["error"])
                 else:
-                    ai_text = res_ana["content"]
+                    ai_text = ana_result["content"]
+
+            # Если нет AI_invest, запрашиваем информацию о фондах
             if not ai_invest:
-                res_inv = get_grok_invest(name, symbol)
-                if "error" in res_inv:
-                    error_log.append("Invest error: " + res_inv["error"])
+                invest_result = get_grok_invest(name, symbol)
+                if "error" in invest_result:
+                    error_log.append("Invest error: " + invest_result["error"])
                 else:
-                    ai_invest = res_inv["content"]
+                    ai_invest = invest_result["content"]
+
             return (coin_id, ai_text, ai_invest, error_log)
 
         from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -138,11 +146,14 @@ def main():
         with ThreadPoolExecutor(max_workers=5) as executor:
             future_to_coin = {executor.submit(process_coin, c): c for c in tasks}
             for future in as_completed(future_to_coin):
-                cdata = future_to_coin[future]
+                coin_data = future_to_coin[future]
+                cid = coin_data["coin_id"]
                 try:
                     coin_id, new_ai_text, new_ai_invest, err_log = future.result()
                     results.append((coin_id, new_ai_text, new_ai_invest, err_log))
+                    print(f"[process_coin] Завершено для монеты {cid}.")
                 except Exception as e:
+                    print(f"[process_coin] Ошибка для монеты {cid}: {e}")
                     traceback.print_exc()
 
         # 5) Записываем обновления в базу
@@ -156,6 +167,8 @@ def main():
                 cnt_updates += 1
                 if err_log:
                     print(f"[coin_id={cid}] Были ошибки: {err_log}")
+                else:
+                    print(f"[coin_id={cid}] Данные AI_text и AI_invest успешно обновлены.")
 
         conn.commit()
         upd_cursor.close()
