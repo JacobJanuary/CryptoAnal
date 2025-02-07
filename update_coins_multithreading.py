@@ -33,36 +33,6 @@ cpu_samples = []
 stop_cpu_sampling = threading.Event()
 
 
-def remove_coin_from_db(coin_id):
-    """
-    Сначала удаляет все записи из coin_category_relation по данному coin_id,
-    затем удаляет саму монету из coin_gesco_coins.
-    Возвращает True, если действительно была удалена хотя бы 1 запись в coin_gesco_coins.
-    """
-    try:
-        conn = mysql.connector.connect(**db_config)
-        cursor = conn.cursor()
-
-        # 1) Удаляем связанные записи из coin_category_relation
-        del_cats_query = "DELETE FROM coin_category_relation WHERE coin_id = %s"
-        cursor.execute(del_cats_query, (coin_id,))
-
-        # 2) Удаляем саму монету из coin_gesco_coins
-        del_coin_query = "DELETE FROM coin_gesco_coins WHERE id = %s"
-        cursor.execute(del_coin_query, (coin_id,))
-
-        conn.commit()
-
-        deleted_rows = cursor.rowcount  # кол-во удалённых строк в последнем DELETE
-        return deleted_rows > 0
-    except mysql.connector.Error as e:
-        print(f"Ошибка при удалении монеты {coin_id}: {e}")
-        return False
-    finally:
-        if 'conn' in locals() and conn.is_connected():
-            cursor.close()
-            conn.close()
-
 def cpu_sampling():
     """
     Функция для измерения загрузки CPU.

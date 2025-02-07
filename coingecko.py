@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify
 from flask_caching import Cache
 from flask_mysqldb import MySQL
-import mysql.connector as mc
+import mysql.connector as mc  # <-- используем mysql.connector под псевдонимом mc
 
 app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'simple'})
@@ -19,10 +19,10 @@ app.config['MYSQL_USER'] = os.getenv("MYSQL_USER", "root")
 app.config['MYSQL_PASSWORD'] = os.getenv("MYSQL_PASSWORD", "password")
 app.config['MYSQL_DB'] = os.getenv("MYSQL_DATABASE", "crypto_db")
 
+# Инициализируем MySQL от flask_mysqldb (если нужно в других местах)
 mysql = MySQL(app)
 
-# Если вы используете mysql.connector в каких-то местах, можно сформировать
-# db_config для удобного использования:
+# Настройка для mysql.connector
 db_config = {
     'host': app.config['MYSQL_HOST'],
     'user': app.config['MYSQL_USER'],
@@ -30,7 +30,7 @@ db_config = {
     'database': app.config['MYSQL_DB']
 }
 
-# Получение аналитики с помощью API Grok
+
 def get_grok_analytics(name, symbol):
     if not XAI_API_KEY:
         error_msg = "API ключ не установлен. Установите переменную окружения XAI_API_KEY."
@@ -88,6 +88,7 @@ def get_grok_invest(name, symbol):
         traceback.print_exc()
         return {"error": str(e)}
 
+
 # Пользовательский фильтр для форматирования объема
 @app.template_filter('format_volume')
 def format_volume(value):
@@ -95,13 +96,15 @@ def format_volume(value):
         vol_str = f"${value / 1_000_000:.2f}".replace('.', ',')
         return f"{vol_str} млн"
     return "N/A"
+
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     try:
+        # Для работы с Flask-MySQLdb
         cur = mysql.connection.cursor()
 
-        # Если GET, то читаем сохраненные фильтры и используем их,
-        # если их нет, подставляем значения по умолчанию:
+        # Если GET, то читаем сохраненные фильтры
         default_filters = {
             "vol_min": 10000,
             "growth6h": 100,
@@ -124,7 +127,7 @@ def index():
         else:
             filters = default_filters
 
-        # Формируем запрос к функции cg_GetFilteredCoins с нужными параметрами.
+        # Формируем запрос к процедуре
         query = "CALL cg_GetFilteredCoins(%s, %s, %s, %s, %s, %s)"
         params = (filters["vol_min"], filters["growth6h"], filters["growth1h"],
                   filters["price_change_max"], filters["price_change_min"], filters["market_cap_rank"])
@@ -134,11 +137,12 @@ def index():
         crypto_data = [dict(zip(col_names, row)) for row in rows]
         cur.close()
 
-        # После того как получили crypto_data (массив словарей, содержащих coin_id и т.д.)
+        # Дополнительная логика работы с coin_ids
         if crypto_data:
             coin_ids = [coin['coin_id'] for coin in crypto_data]
             if coin_ids:
                 format_str = ','.join(['%s'] * len(coin_ids))
+                # Снова используем Flask-MySQLdb
                 cur = mysql.connection.cursor()
                 cur.execute(f"""
                     SELECT ccr.coin_id, cc.name
@@ -147,9 +151,8 @@ def index():
                     WHERE ccr.coin_id IN ({format_str})
                     ORDER BY cc.Weight ASC
                 """, tuple(coin_ids))
-                rows = cur.fetchall()  # [(coin_id, category_name), ...]
+                rows = cur.fetchall()
 
-                # Построим mapping coin_id -> [список категорий]
                 from collections import defaultdict
                 cat_map = defaultdict(list)
                 for r in rows:
@@ -157,49 +160,39 @@ def index():
                     cat_name = r[1]
                     cat_map[c_id].append(cat_name)
 
-                # Для каждой монеты собираем строку категорий
                 for coin in crypto_data:
                     c_id = coin['coin_id']
                     categories_list = cat_map.get(c_id, [])
-                    # Сформируем строку "Cat1, Cat2, Cat3"
                     coin['categories_str'] = ", ".join(categories_list)
 
-                #rev1
-                format_str = ','.join(['%s'] * len(coin_ids))
+                # rev1 - Получение min_about
                 cur = mysql.connection.cursor()
-                # В этом запросе мы выбираем минимальное (и, следовательно, самую "важную") неравную 0 категорию
-                # Если категория = 0, она исключается, и монета не считается "трендовой"
                 query = f"""
-                            SELECT
-                              ccr.coin_id,
-                              MIN(cc.about_what) AS min_about
-                            FROM coin_category_relation ccr
-                            JOIN CG_Categories cc ON ccr.category_id = cc.category_id
-                            WHERE ccr.coin_id IN ({format_str})
-                              AND cc.about_what <> 0
-                            GROUP BY ccr.coin_id
-                        """
+                    SELECT
+                      ccr.coin_id,
+                      MIN(cc.about_what) AS min_about
+                    FROM coin_category_relation ccr
+                    JOIN CG_Categories cc ON ccr.category_id = cc.category_id
+                    WHERE ccr.coin_id IN ({format_str})
+                      AND cc.about_what <> 0
+                    GROUP BY ccr.coin_id
+                """
                 cur.execute(query, tuple(coin_ids))
-                rows = cur.fetchall()  # [(coin_id, min_about_what), ...]
+                rows = cur.fetchall()
                 cur.close()
 
-                # Построим mapping coin_id -> min_about_what
-                from collections import defaultdict
                 about_map = {}
                 for r in rows:
                     c_id = r[0]
                     min_about = r[1]
                     about_map[c_id] = min_about
 
-                # Для каждой монеты запишем min_about_what (или 0/None, если нет)
                 for coin in crypto_data:
                     c_id = coin['coin_id']
-                    coin['min_about'] = about_map.get(c_id, 0)  # или None
+                    coin['min_about'] = about_map.get(c_id, 0)
 
-                #end rev1
-
-        # Если POST-запрос для аналитики и инвестиций
         if request.method == "POST":
+            # POST-запрос для аналитики
             name = request.form.get("name")
             symbol = request.form.get("symbol")
             if not name or not symbol:
@@ -207,7 +200,7 @@ def index():
                 print("[index] Ошибка:", error_msg)
                 return jsonify({"error": error_msg}), 400
 
-            # Проверяем, есть ли уже сохранённый AI_text в БД
+            # Проверяем, есть ли уже AI_text
             cur = mysql.connection.cursor()
             cur.execute("SELECT AI_text FROM coin_gesco_coins WHERE name = %s AND symbol = %s", (name, symbol))
             row = cur.fetchone()
@@ -243,12 +236,12 @@ def index():
             return jsonify({"content": ai_text})
 
         return render_template("coingecko.html", crypto_data=crypto_data)
+
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": f"Ошибка: {e}"})
 
 
-# Обработчик для переключения избранного (toggle_favourite)
 @app.route("/toggle_favourite", methods=["POST"])
 def toggle_favourite():
     try:
@@ -272,12 +265,10 @@ def toggle_favourite():
         return jsonify({"error": str(e)}), 500
 
 
-# Маршрут для сохранения настроек фильтров на сервере
 @app.route("/save_filters", methods=["POST"])
 def save_filters():
     try:
         data = request.get_json()
-        # Получаем значения фильтров из входного JSON
         vol_min = data.get("volMin")
         growth6h = data.get("growth6h")
         growth1h = data.get("growth1h")
@@ -285,42 +276,37 @@ def save_filters():
         price_change_min = data.get("priceChangeMin")
         market_cap_rank = data.get("marketCapRank")
 
-        # Преобразуем значения к числовому типу и заменяем нули на None
         try:
-            vol_min = float(vol_min) if vol_min is not None and float(vol_min) != 0 else None
+            vol_min = float(vol_min) if vol_min and float(vol_min) != 0 else None
         except:
             vol_min = None
 
         try:
-            growth6h = float(growth6h) if growth6h is not None and float(growth6h) != 0 else None
+            growth6h = float(growth6h) if growth6h and float(growth6h) != 0 else None
         except:
             growth6h = None
 
         try:
-            growth1h = float(growth1h) if growth1h is not None and float(growth1h) != 0 else None
+            growth1h = float(growth1h) if growth1h and float(growth1h) != 0 else None
         except:
             growth1h = None
 
         try:
-            price_change_max = float(price_change_max) if price_change_max is not None and float(
-                price_change_max) != 0 else None
+            price_change_max = float(price_change_max) if price_change_max and float(price_change_max) != 0 else None
         except:
             price_change_max = None
 
         try:
-            price_change_min = float(price_change_min) if price_change_min is not None and float(
-                price_change_min) != 0 else None
+            price_change_min = float(price_change_min) if price_change_min and float(price_change_min) != 0 else None
         except:
             price_change_min = None
 
         try:
-            market_cap_rank = int(market_cap_rank) if market_cap_rank is not None and int(
-                market_cap_rank) != 0 else None
+            market_cap_rank = int(market_cap_rank) if market_cap_rank and int(market_cap_rank) != 0 else None
         except:
             market_cap_rank = None
 
         cur = mysql.connection.cursor()
-        # Если запись с id = 1 уже существует, обновляем её
         cur.execute("SELECT id FROM filter_settings WHERE id = 1")
         row = cur.fetchone()
         if row:
@@ -349,7 +335,6 @@ def safe_round(value, precision=2):
         return "N/A"
     return round(value, precision)
 
-# Новый маршрут «Избранные»
 @app.route("/favourites")
 def favourites():
     """
@@ -358,34 +343,26 @@ def favourites():
     Порядок сортировки: asc, desc.
     """
     try:
-        # Получаем параметры сортировки из URL
-        sort_by = request.args.get('sort_by', 'market_cap_rank')  # по умолчанию сортировка по рангу
-        order = request.args.get('order', 'asc')  # по умолчанию по возрастанию
+        sort_by = request.args.get('sort_by', 'market_cap_rank')
+        order = request.args.get('order', 'asc')
 
-        # Определяем допустимые поля для сортировки
         valid_sort_fields = {
             'name': 'c.name',
             'market_cap_rank': 'c.market_cap_rank',
             'price_change_percentage_24h': 'c.price_change_percentage_24h'
         }
 
-        # Проверяем, является ли sort_by допустимым
         if sort_by not in valid_sort_fields:
-            sort_by = 'market_cap_rank'  # если нет, устанавливаем значение по умолчанию
+            sort_by = 'market_cap_rank'
 
-        # Проверяем, является ли order допустимым
         if order not in ['asc', 'desc']:
-            order = 'asc'  # если нет, устанавливаем значение по умолчанию
+            order = 'asc'
 
-        # Формируем ORDER BY часть запроса
         order_by_clause = f"ORDER BY {valid_sort_fields[sort_by]} {order.upper()}"
 
-        # Подключаемся через mysql.connector напрямую
-        # Подключаемся через mysql.connector (используем 'mc', а не 'mysql_db')
         conn = mc.connect(**db_config)
         cursor = conn.cursor(dictionary=True)
 
-        # SQL-запрос с динамической сортировкой
         query = f"""
             SELECT c.id,
                    c.name,
@@ -410,7 +387,6 @@ def favourites():
         cursor.close()
         conn.close()
 
-        # Определяем противоположный порядок для следующего клика
         opposite_order = 'desc' if order == 'asc' else 'asc'
 
         return render_template("favourites.html", coins=rows, current_sort=sort_by, current_order=order,
@@ -420,56 +396,159 @@ def favourites():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-@app.route("/coin_details/<coin_id>")
+
+@app.route("/coin_details/<coin_id>", methods=["GET"])
 def coin_details(coin_id):
     """
-    Возвращает подробные данные по монете с идентификатором coin_id.
-    Данные берутся из таблицы coin_gecko_coins.
-    Ожидаемые поля:
-      - name, symbol
-      - description_en (можно вернуть обрезанную версию и полный текст)
-      - market_cap_rank
-      - ath_usd, ath_change_percentage_usd, ath_date_usd
-      - atl_usd, atl_change_percentage_usd, atl_date_usd
-      - total_volume_usd
-      - high_24h_usd, low_24h_usd
-      - watchlist_portfolio_users
+    Возвращает подробные данные по монете:
       - AI_text, AI_invest
+      - market_cap_usd, market_cap_rank, ath_usd, ath_change_percentage_usd, ath_date_usd
+      - atl_usd, atl_change_percentage_usd, atl_date_usd
+      - total_volume_usd, current_price_usd, high_24h_usd, low_24h_usd
+      - данные из coin_history_365 (max365_usd, max365_date, min365_usd, min365_date, и конкретные даты)
     """
     try:
         conn = mc.connect(**db_config)
         cursor = conn.cursor(dictionary=True)
-        query = """
-            SELECT 
-              id,
-              name,
-              symbol,
-              description_en,
-              market_cap_rank,
-              ath_usd,
-              ath_change_percentage_usd,
-              ath_date_usd,
-              atl_usd,
-              atl_change_percentage_usd,
-              atl_date_usd,
-              total_volume_usd,
-              high_24h_usd,
-              low_24h_usd,
-              watchlist_portfolio_users,
-              AI_text,
-              AI_invest
-            FROM coin_gesco_coins
-            WHERE id = %s
-        """
-        cursor.execute(query, (coin_id,))
-        coin = cursor.fetchone()
-        cursor.close()
-        conn.close()
 
+        query_main = """
+            SELECT 
+                c.id AS coin_id,
+                c.name,
+                c.symbol,
+                c.AI_text,
+                c.AI_invest,
+                c.market_cap_usd,
+                c.market_cap_rank,
+                c.ath_usd, c.ath_change_percentage_usd, c.ath_date_usd,
+                c.atl_usd, c.atl_change_percentage_usd, c.atl_date_usd,
+                c.total_volume_usd,
+                c.current_price_usd,
+                c.high_24h_usd,
+                c.low_24h_usd,
+                c.watchlist_portfolio_users
+            FROM coin_gesco_coins c
+            WHERE c.id = %s
+        """
+        cursor.execute(query_main, (coin_id,))
+        coin = cursor.fetchone()
         if not coin:
             return jsonify({"error": "Монета не найдена"}), 404
 
+        query_hist = """
+            SELECT
+              max365_usd, max365_date,
+              min365_usd, min365_date,
+              `02-02-2025` AS d_02_02_25,
+              `03-02-2025` AS d_03_02_25,
+              `04-02-2025` AS d_04_02_25,
+              `04-08-2024` AS d_04_08_24,
+              `05-08-2024` AS d_05_08_24,
+              `06-08-2024` AS d_06_08_24,
+              `07-12-2024` AS d_07_12_24
+            FROM coin_history_365
+            WHERE coin_id = %s
+        """
+        cursor.execute(query_hist, (coin_id,))
+        row_hist = cursor.fetchone()
+
+        if row_hist:
+            coin.update(row_hist)
+        else:
+            coin["max365_usd"] = None
+            coin["max365_date"] = None
+            coin["min365_usd"] = None
+            coin["min365_date"] = None
+            coin["d_02_02_25"] = None
+            coin["d_03_02_25"] = None
+            coin["d_04_02_25"] = None
+            coin["d_04_08_24"] = None
+            coin["d_05_08_24"] = None
+            coin["d_06_08_24"] = None
+            coin["d_07_12_24"] = None
+
+        cursor.close()
+        conn.close()
+
         return jsonify(coin)
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/made_in_usa")
+def made_in_usa():
+    """
+    Отображает страницу с монетами категории 'made-in-usa'.
+    Поддерживаемые поля для сортировки:
+       name, market_cap_rank, price_change_percentage_24h, market_cap, volume_24h.
+    """
+    try:
+        sort_by = request.args.get('sort_by', 'market_cap_rank')
+        order = request.args.get('order', 'asc')
+
+        # Расширяем словарь полей для сортировки
+        valid_sort_fields = {
+            'name': 'c.name',
+            'market_cap_rank': 'c.market_cap_rank',
+            'price_change_percentage_24h': 'c.price_change_percentage_24h',
+            'market_cap': 'c.market_cap_usd',       # <-- новое поле
+            'volume_24h': 'c.total_volume_usd'      # <-- новое поле
+        }
+
+        # Проверяем, не запросили ли недопустимое поле
+        if sort_by not in valid_sort_fields:
+            sort_by = 'market_cap_rank'
+        if order not in ['asc', 'desc']:
+            order = 'asc'
+
+        order_by_clause = f"ORDER BY {valid_sort_fields[sort_by]} {order.upper()}"
+
+        conn = mc.connect(**db_config)
+        cursor = conn.cursor(dictionary=True)
+
+        # Выбираем монеты из категории 'made-in-usa'
+        query = f"""
+            SELECT c.id,
+                   c.name,
+                   c.symbol,
+                   c.market_cap_rank,
+                   c.current_price_usd,
+                   c.price_change_percentage_24h,
+                   c.market_cap_usd,
+                   c.total_volume_usd,
+                   (
+                     SELECT cc.name
+                     FROM coin_category_relation ccr
+                     JOIN CG_Categories cc ON ccr.category_id = cc.category_id
+                     WHERE ccr.coin_id = c.id
+                     ORDER BY cc.Weight ASC
+                     LIMIT 1
+                   ) AS main_category
+            FROM coin_gesco_coins c
+            JOIN coin_category_relation r ON c.id = r.coin_id
+            WHERE r.category_id = 'made-in-usa'
+            {order_by_clause}
+        """
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        # Кол-во монет
+        total_count = len(rows)
+
+        # Определяем противоположное направление сортировки (asc <-> desc)
+        opposite_order = 'desc' if order == 'asc' else 'asc'
+
+        # Рендерим шаблон made_in_usa.html
+        return render_template(
+            "made_in_usa.html",
+            coins=rows,
+            current_sort=sort_by,
+            current_order=order,
+            opposite_order=opposite_order,
+            total_count=total_count
+        )
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500

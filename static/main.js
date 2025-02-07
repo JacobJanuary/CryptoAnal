@@ -1,15 +1,15 @@
 // Настраиваем соответствие about_what -> цвет
 const categoryColors = {
-    "Фонды": { code: 1, color: "#F0FFF0" },
-    "Мемы": { code: 2, color: "#FFF0F5" },
-    "Маск": { code: 3, color: "#FFFACD" },
-    "Ai": { code: 4, color: "#E6E6FA" },
-    "Infrastructure": { code: 5, color: "#F0FFFF" },
-    "dePin": { code: 6, color: "#F5F5DC" },
-    "GameFi": { code: 7, color: "#FAF0E6" },
-    "RWA": { code: 8, color: "#FFE4E1" },
-    "USA":{ code: 20, color: "#39E75F" },
-    "Other trended": { range: [9, 18], color: "#F8F8FF" }
+    "Фонды": {code: 1, color: "#F0FFF0"},
+    "Мемы": {code: 2, color: "#FFF0F5"},
+    "Маск": {code: 3, color: "#FFFACD"},
+    "Ai": {code: 4, color: "#E6E6FA"},
+    "Infrastructure": {code: 5, color: "#F0FFFF"},
+    "dePin": {code: 6, color: "#F5F5DC"},
+    "GameFi": {code: 7, color: "#FAF0E6"},
+    "RWA": {code: 8, color: "#FFE4E1"},
+    "USA": {code: 20, color: "#39E75F"},
+    "Other trended": {range: [9, 18], color: "#F8F8FF"}
 };
 
 function hideNonTrended() {
@@ -121,7 +121,7 @@ function setupCategoryTooltips() {
 
 // Функция установки cookie (на случай, если потребуется fallback, можно оставить)
 function setCookie(name, value, days) {
-    const expires = days ? "; expires=" + new Date(Date.now() + days*864e5).toUTCString() : "";
+    const expires = days ? "; expires=" + new Date(Date.now() + days * 864e5).toUTCString() : "";
     document.cookie = name + "=" + encodeURIComponent(value) + expires + "; path=/";
 }
 
@@ -132,6 +132,7 @@ function getCookie(name) {
         return parts[0] === name ? decodeURIComponent(parts[1]) : r;
     }, '');
 }
+
 // Функция для открытия модального окна фильтров
 function openFiltersModal() {
     const modal = document.getElementById('filter-modal');
@@ -179,40 +180,36 @@ function saveFilters() {
         },
         body: JSON.stringify(filters)
     })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`Ошибка сервера: ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        if (data.error) {
-            alert(`Ошибка: ${data.error}`);
-        } else {
-            alert("Настройки фильтров сохранены");
-            // Сохраняем настройки в cookies для локального хранения (опционально)
-            setCookie("volMin", volMin, 30);
-            setCookie("growth6h", growth6h, 30);
-            setCookie("growth1h", growth1h, 30);
-            setCookie("priceChangeMax", priceChangeMax, 30);
-            setCookie("priceChangeMin", priceChangeMin, 30);
-            setCookie("marketCapRank", marketCapRank, 30);
-            // Обновляем данные (например, перезагружаем страницу)
-            location.reload();
-        }
-    })
-    .catch(error => {
-        console.error('Ошибка при сохранении фильтров:', error);
-        alert(`Ошибка при сохранении настроек: ${error.message}`);
-    });
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Ошибка сервера: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                alert(`Ошибка: ${data.error}`);
+            } else {
+                alert("Настройки фильтров сохранены");
+                // Сохраняем настройки в cookies для локального хранения (опционально)
+                setCookie("volMin", volMin, 30);
+                setCookie("growth6h", growth6h, 30);
+                setCookie("growth1h", growth1h, 30);
+                setCookie("priceChangeMax", priceChangeMax, 30);
+                setCookie("priceChangeMin", priceChangeMin, 30);
+                setCookie("marketCapRank", marketCapRank, 30);
+                // Обновляем данные (например, перезагружаем страницу)
+                location.reload();
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка при сохранении фильтров:', error);
+            alert(`Ошибка при сохранении настроек: ${error.message}`);
+        });
 
     closeFiltersModal();
 }
 
-// Функция закрытия модального окна для AI аналитики
-function closeModal() {
-    document.getElementById('modal').style.display = 'none';
-}
 
 // Функция для форматирования аналитического текста
 function formatAnalyticsContent(content) {
@@ -242,30 +239,30 @@ function showAIAnalytics(name, symbol) {
         },
         body: `name=${encodeURIComponent(name)}&symbol=${encodeURIComponent(symbol)}`
     })
-    .then(response => {
-        if (!response.ok) {
-            return response.text().then(err => {
-                console.error('Ошибка на сервере:', err);
-                throw new Error(`Ошибка сервера: ${response.status}`);
-            });
-        }
-        return response.json();
-    })
-    .then(data => {
-        if (data.error) {
-            alert(`Ошибка: ${data.error}`);
+        .then(response => {
+            if (!response.ok) {
+                return response.text().then(err => {
+                    console.error('Ошибка на сервере:', err);
+                    throw new Error(`Ошибка сервера: ${response.status}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                alert(`Ошибка: ${data.error}`);
+                modal.style.display = 'none';
+            } else {
+                modalLoading.style.display = 'none';
+                modalContent.style.display = 'block';
+                modalContent.innerHTML = formatAnalyticsContent(data.content);
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка fetch:', error);
+            alert(`Произошла ошибка: ${error.message}`);
             modal.style.display = 'none';
-        } else {
-            modalLoading.style.display = 'none';
-            modalContent.style.display = 'block';
-            modalContent.innerHTML = formatAnalyticsContent(data.content);
-        }
-    })
-    .catch(error => {
-        console.error('Ошибка fetch:', error);
-        alert(`Произошла ошибка: ${error.message}`);
-        modal.style.display = 'none';
-    });
+        });
 }
 
 function sortTable(columnIndex, type) {
@@ -337,6 +334,44 @@ function toggleFavorite(coinId, currentVal) {
             isFavourites: newVal
         })
     })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Ошибка сервера: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                alert(`Ошибка: ${data.error}`);
+                return;
+            }
+            const button = document.getElementById(`favorite-button-${coinId}`);
+            if (newVal) {
+                button.textContent = 'Удалить';
+            } else {
+                button.textContent = 'Добавить';
+            }
+            button.setAttribute('onclick', `toggleFavorite('${coinId}', ${newVal})`);
+        })
+        .catch(error => {
+            console.error('Ошибка при toggleFavorite:', error);
+            alert(`Произошла ошибка: ${error.message}`);
+        });
+}
+
+function showCoinDetails(coinId) {
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalContent = document.getElementById('modal-content-data');
+    const modalLoading = document.getElementById('modal-loading');
+
+    modalTitle.textContent = "Загрузка...";
+    modalContent.innerHTML = "";
+    modalLoading.style.display = 'block';
+    modalContent.style.display = 'none';
+    modal.style.display = 'block';
+
+    fetch(`/coin_details/${coinId}`)
     .then(response => {
         if (!response.ok) {
             throw new Error(`Ошибка сервера: ${response.status}`);
@@ -345,104 +380,258 @@ function toggleFavorite(coinId, currentVal) {
     })
     .then(data => {
         if (data.error) {
-            alert(`Ошибка: ${data.error}`);
-            return;
+            throw new Error(data.error);
         }
-        const button = document.getElementById(`favorite-button-${coinId}`);
-        if (newVal) {
-            button.textContent = 'Удалить';
-        } else {
-            button.textContent = 'Добавить';
-        }
-        button.setAttribute('onclick', `toggleFavorite('${coinId}', ${newVal})`);
+        // Заголовок
+        modalTitle.textContent = `${data.name} (${data.symbol})`;
+
+        let html = "";
+
+        // AI Аналитика
+        html += formatAiBlock("AI Аналитика", data.AI_text, 10);
+
+        // AI Фонды
+        html += formatAiBlock("AI Фонды", data.AI_invest, 5);
+
+        // Далее те же поля Market Cap, Rank, ATH, ATL, ...
+        // ...
+
+        modalContent.innerHTML = html;
+        modalLoading.style.display = 'none';
+        modalContent.style.display = 'block';
     })
-    .catch(error => {
-        console.error('Ошибка при toggleFavorite:', error);
-        alert(`Произошла ошибка: ${error.message}`);
+    .catch(err => {
+        console.error("Ошибка при загрузке деталей монеты:", err);
+        alert("Ошибка: " + err.message);
+        modal.style.display = 'none';
     });
 }
 
-// Функция для загрузки подробной информации по монете и отображения в модальном окне
+// Модифицированная функция formatAiBlock
+function formatAiBlock(title, text, lineCount) {
+    if (!text) {
+        return `<p><strong>${title}:</strong> N/A</p>`;
+    }
+
+    // Применяем нашу логику форматирования (например, formatAnalyticsContent)
+    // к полной версии текста, чтобы поддержать **...** и ### ...
+    const formattedFull = formatAnalyticsContent(text);
+
+    // Разбиваем текст на строки (по \n)
+    const lines = text.split("\n");
+    if (lines.length <= lineCount) {
+        // если меньше нужного количества строк, выводим всё целиком в форматированном виде
+        return `
+          <p><strong>${title}:</strong></p>
+          <div>${formatAnalyticsContent(text)}</div>
+        `;
+    } else {
+        // показываем только первые lineCount строк
+        const firstLines = lines.slice(0, lineCount).join("\n");
+        const formattedCollapsed = formatAnalyticsContent(firstLines);
+
+        return `
+          <p><strong>${title}:</strong></p>
+          <div class="ai-block">
+            <div class="collapsed-text">${formattedCollapsed}</div>
+            <button onclick="toggleAiExpand(this)" data-full='${escapeHtml(formattedFull)}'>
+              >> Развернуть
+            </button>
+          </div>
+        `;
+    }
+}
+
+// При нажатии на >> Развернуть
+function toggleAiExpand(btn) {
+    const full = unescapeHtml(btn.getAttribute("data-full"));
+    const block = btn.closest(".ai-block");
+    block.innerHTML = full;
+}
+
+// Пример экранирования HTML
+function escapeHtml(str) {
+    if (!str) return "";
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+}
+function unescapeHtml(str) {
+    if (!str) return "";
+    return str
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">");
+}
+
+// main.js
+
+// Пример функции, которая открывает модальное окно и показывает детальные данные монеты
 function showCoinDetails(coinId) {
-    // Получаем модальное окно (можно переиспользовать существующее окно модального окна)
     const modal = document.getElementById('modal');
     const modalTitle = document.getElementById('modal-title');
     const modalContent = document.getElementById('modal-content-data');
     const modalLoading = document.getElementById('modal-loading');
 
-    // Очищаем содержимое модального окна и показываем индикатор загрузки
-    modalTitle.textContent = "Загрузка данных...";
+    // Очищаем / показываем модалку
+    modalTitle.textContent = "Загрузка...";
     modalContent.innerHTML = "";
-    modal.style.display = 'block';
     modalLoading.style.display = 'block';
     modalContent.style.display = 'none';
+    modal.style.display = 'block';
 
-    // Выполняем AJAX-запрос к маршруту /coin_details/<coinId>
+    // Запрашиваем данные
     fetch(`/coin_details/${coinId}`)
     .then(response => {
         if (!response.ok) {
-            return response.json().then(errData => {
-                throw new Error(errData.error || `Ошибка: ${response.status}`);
-            });
+            throw new Error(`Ошибка сервера: ${response.status}`);
         }
         return response.json();
     })
     .then(data => {
-        // Заполняем модальное окно подробной информацией
-        // Для длинных полей (description_en, AI_text, AI_invest) покажем только первые 200 символов с кнопкой ">" для разворачивания
-        function collapseText(text, limit = 200) {
-            if (!text) return "N/A";
-            if (text.length <= limit) return text;
-            // возвращаем обрезанную версию и кнопку ">"
-            return `<span class="collapsed-text">${text.substring(0, limit)}...</span>
-                    <button class="expand-btn" onclick="toggleExpand(this)">></button>
-                    <span class="full-text" style="display:none;">${text}</span>`;
+        if (data.error) {
+            throw new Error(data.error);
         }
 
-        let html = `
-            <h3>${data.name} (${data.symbol})</h3>
-            <p><strong>Market Cap Rank:</strong> ${data.market_cap_rank || "N/A"}</p>
-            <p><strong>Description:</strong> ${collapseText(data.description_en)}</p>
-            <p><strong>All-Time High (ATH):</strong> ${data.ath_usd || "N/A"} USD, 
-               ${data.ath_change_percentage_usd ? data.ath_change_percentage_usd.toFixed(2) + "%" : "N/A"}, 
-               ${data.ath_date_usd ? data.ath_date_usd : "N/A"}</p>
-            <p><strong>All-Time Low (ATL):</strong> ${data.atl_usd || "N/A"} USD, 
-               ${data.atl_change_percentage_usd ? data.atl_change_percentage_usd.toFixed(2) + "%" : "N/A"}, 
-               ${data.atl_date_usd ? data.atl_date_usd : "N/A"}</p>
-            <p><strong>Total Volume (USD):</strong> ${data.total_volume_usd || "N/A"}</p>
-            <p><strong>24h High:</strong> ${data.high_24h_usd || "N/A"} USD</p>
-            <p><strong>24h Low:</strong> ${data.low_24h_usd || "N/A"} USD</p>
-            <p><strong>Watchlist Users:</strong> ${data.watchlist_portfolio_users || "N/A"}</p>
-            <p><strong>AI Analytics:</strong> ${collapseText(formatAnalyticsContent(data.AI_text))}</p>
-            <p><strong>AI Invest:</strong> ${collapseText(formatAnalyticsContent(data.AI_invest))}</p>
-        `;
-        modalTitle.textContent = "Подробная информация";
+        // Устанавливаем заголовок модалки = "Name (Symbol)"
+        modalTitle.textContent = `${data.name} (${data.symbol})`;
+
+        // Начинаем формировать HTML
+        let html = "";
+
+
+        // -----------------------------
+        // 2) Информация о монете
+        // -----------------------------
+        let mcMln = data.market_cap_usd ? (data.market_cap_usd / 1e6).toFixed(2) : "N/A";
+        let rank = data.market_cap_rank || "N/A";
+        let volMln = data.total_volume_usd ? (data.total_volume_usd / 1e6).toFixed(2) : "N/A";
+        let cPrice = data.current_price_usd || "N/A";
+        let high24 = data.high_24h_usd || "N/A";
+        let low24 = data.low_24h_usd || "N/A";
+
+        html += `<hr><h3>Информация по монете</h3>`;
+        html += `<p><strong>Market Cap:</strong> ${mcMln} млн. (Rank: ${rank})</p>`;
+        html += `<p><strong>Volume:</strong> ${volMln} млн. | <strong>Price:</strong> $${cPrice}</p>`;
+        html += `<p>24h Low: $${low24}, 24h High: $${high24}</p>`;
+
+        // ATH / ATL
+        let athVal = data.ath_usd || "N/A";
+        let athPct = data.ath_change_percentage_usd || "N/A";
+        let athDate = data.ath_date_usd || "N/A";
+        let atlVal = data.atl_usd || "N/A";
+        let atlPct = data.atl_change_percentage_usd || "N/A";
+        let atlDate = data.atl_date_usd || "N/A";
+        html += `<p><strong>ATH:</strong> $${athVal}, ${athPct}%, ${athDate}</p>`;
+        html += `<p><strong>ATL:</strong> $${atlVal}, ${atlPct}%, ${atlDate}</p>`;
+
+        // High365 / Low365
+        let max365 = data.max365_usd || "N/A";
+        let max365Date = data.max365_date || "N/A";
+        let min365 = data.min365_usd || "N/A";
+        let min365Date = data.min365_date || "N/A";
+        html += `<p><strong>High365:</strong> $${max365} (${max365Date}), 
+                 <strong>Low365:</strong> $${min365} (${min365Date})</p>`;
+
+        // watchlist_portfolio_users
+        if (data.watchlist_portfolio_users !== undefined && data.watchlist_portfolio_users !== null) {
+            html += `<p><strong>Watchlist:</strong> ${data.watchlist_portfolio_users}</p>`;
+        }
+
+        // -----------------------------
+        // 3) Исторические даты
+        // -----------------------------
+        html += `<hr><h3>Исторические даты</h3>`;
+        html += generateDatePriceBlock(data);
+
+        // -----------------------------
+        // 4) AI Аналитика (полностью, с форматированием)
+        // -----------------------------
+        html += `<hr><h3>AI Аналитика</h3>`;
+        html += formatAnalyticsContent(data.AI_text || "Нет данных");
+
+        // -----------------------------
+        // 1) AI Фонды (полностью, с форматированием)
+        // -----------------------------
+        html += `<h3>AI Фонды</h3>`;
+        html += formatAnalyticsContent(data.AI_invest || "Нет данных");
+
+        // Помещаем всё в окно
         modalContent.innerHTML = html;
         modalLoading.style.display = 'none';
         modalContent.style.display = 'block';
     })
-    .catch(error => {
-        alert(`Ошибка загрузки данных: ${error.message}`);
+    .catch(err => {
+        console.error("Ошибка при загрузке деталей монеты:", err);
+        alert("Ошибка: " + err.message);
         modal.style.display = 'none';
     });
 }
 
-// Функция для переключения развёрнутого/свернутого вида длинного текста
-function toggleExpand(button) {
-    const fullTextSpan = button.nextElementSibling;
-    const collapsedSpan = button.previousElementSibling;
-    if (fullTextSpan.style.display === 'none') {
-        fullTextSpan.style.display = 'inline';
-        collapsedSpan.style.display = 'none';
-        button.textContent = "<";
-    } else {
-        fullTextSpan.style.display = 'none';
-        collapsedSpan.style.display = 'inline';
-        button.textContent = ">";
-    }
+// Пример функции форматирования AI-текста (убираем свернуть/развернуть):
+function formatAnalyticsContent(content) {
+    if (!content) return 'N/A';
+    return content
+      // Пример простой замены ### и **...** + переносы
+      .replace(/###\s*(.*?)\n/g, '<h3>$1</h3>\n')
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br>');
 }
 
-window.onload = function() {
+// Пример функции для расчёта и генерации HTML по датам
+function generateDatePriceBlock(data) {
+    let html = "<hr><h4>Prices by dates:</h4>";
+
+    // Для примера сделаем пару вычислений:
+    //  - 05.08 $`05_08_2024`
+    //  - Сравнение с 04.08, 06.08 ...
+    // (Можно сделать более универсально, если нужно)
+
+    // Пример чтения data["d_05_08_24"]:
+    const d_04_08_24 = data.d_04_08_24 || null;
+    const d_05_08_24 = data.d_05_08_24 || null;
+    const d_06_08_24 = data.d_06_08_24 || null;
+
+    // Пример вывода
+    html += `<p><strong>05.08.24:</strong> $${d_05_08_24 || "N/A"}</p>`;
+    if (d_05_08_24 && d_04_08_24) {
+        let pct = ((d_05_08_24 - d_04_08_24) / d_04_08_24) * 100;
+        html += `<p>Изменение (04.08 -> 05.08): ${pct.toFixed(2)}%</p>`;
+    }
+    if (d_06_08_24 && d_05_08_24) {
+        let pct = ((d_06_08_24 - d_05_08_24) / d_05_08_24) * 100;
+        html += `<p>Изменение (05.08 -> 06.08): ${pct.toFixed(2)}%</p>`;
+    }
+
+    // Аналогично для 02.02, 03.02, 04.02 ...
+    const d_02_02_25 = data.d_02_02_25 || null;
+    const d_03_02_25 = data.d_03_02_25 || null;
+    const d_04_02_25 = data.d_04_02_25 || null;
+
+    html += `<p><strong>03.02.25:</strong> $${d_03_02_25 || "N/A"}</p>`;
+    if (d_03_02_25 && d_02_02_25) {
+        let pct = ((d_03_02_25 - d_02_02_25) / d_02_02_25) * 100;
+        html += `<p>Изменение (02.02 -> 03.02): ${pct.toFixed(2)}%</p>`;
+    }
+    if (d_04_02_25 && d_03_02_25) {
+        let pct = ((d_04_02_25 - d_03_02_25) / d_03_02_25) * 100;
+        html += `<p>Изменение (03.02 -> 04.02): ${pct.toFixed(2)}%</p>`;
+    }
+
+    // Пример для 07.12.24
+    const d_07_12_24 = data.d_07_12_24 || null;
+    if (d_07_12_24) {
+        html += `<p><strong>07.12.24:</strong> $${d_07_12_24}</p>`;
+    }
+
+    return html;
+}
+function closeModal() {
+    document.getElementById('modal').style.display = 'none';
+}
+
+window.onload = function () {
     console.log("main.js загружен");
     // Обработчик для закрытия модального окна AI аналитики
     document.getElementById('close-modal').addEventListener('click', closeModal);
