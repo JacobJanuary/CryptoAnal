@@ -111,7 +111,7 @@ def index():
             "growth1h": 100,
             "price_change_max": 10,
             "price_change_min": 0,
-            "market_cap_rank": None
+            "market_cap_rank": 9999
         }
         cur.execute("SELECT vol_min, growth6h, growth1h, price_change_max, price_change_min, market_cap_rank FROM filter_settings WHERE id = 1")
         row = cur.fetchone()
@@ -275,36 +275,6 @@ def save_filters():
         price_change_max = data.get("priceChangeMax")
         price_change_min = data.get("priceChangeMin")
         market_cap_rank = data.get("marketCapRank")
-
-        try:
-            vol_min = float(vol_min) if vol_min and float(vol_min) != 0 else None
-        except:
-            vol_min = None
-
-        try:
-            growth6h = float(growth6h) if growth6h and float(growth6h) != 0 else None
-        except:
-            growth6h = None
-
-        try:
-            growth1h = float(growth1h) if growth1h and float(growth1h) != 0 else None
-        except:
-            growth1h = None
-
-        try:
-            price_change_max = float(price_change_max) if price_change_max and float(price_change_max) != 0 else None
-        except:
-            price_change_max = None
-
-        try:
-            price_change_min = float(price_change_min) if price_change_min and float(price_change_min) != 0 else None
-        except:
-            price_change_min = None
-
-        try:
-            market_cap_rank = int(market_cap_rank) if market_cap_rank and int(market_cap_rank) != 0 else None
-        except:
-            market_cap_rank = None
 
         cur = mysql.connection.cursor()
         cur.execute("SELECT id FROM filter_settings WHERE id = 1")
