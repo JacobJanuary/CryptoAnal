@@ -127,7 +127,7 @@
         <tr>
             <td>{{ coin.name }} ({{ coin.symbol }})</td>
             <td>{{ coin.market_cap_rank }}</td>
-            <td>{{ coin.price_change_percentage_24h|round(2) }}</td>
+            <td>{{ coin.price_change_percentage_24h|safe_round(2) }}</td>
 
             <!-- Market Cap (при желании округлить до млн) -->
             <td>

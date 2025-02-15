@@ -553,5 +553,17 @@ def made_in_usa():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+@app.template_filter('safe_round')
+def safe_round(value, precision=2):
+    """
+    Преобразует None в 0 или делает проверку
+    """
+    if value is None:
+        return "N/A"  # или 0, или "N/A"
+    try:
+        return round(value, precision)
+    except:
+        return "N/A"
+
 if __name__ == "__main__":
     app.run(debug=True)
