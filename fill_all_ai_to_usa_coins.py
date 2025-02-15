@@ -1,3 +1,4 @@
+#скрипт заполняет ИИ данные по всем американским проектам
 import os
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed

@@ -1,3 +1,5 @@
+#скрипт заполняет ИИ данные по всем трендовым монетам с изменившимся объемом
+
 import os
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed

@@ -1,3 +1,5 @@
+#обновляет цену и объем, запускать раз в час
+
 import os
 import traceback
 import requests
@@ -27,11 +29,10 @@ COINGECKO_URL = "https://pro-api.coingecko.com/api/v3/simple/price"
 # Максимальное количество потоков
 MAX_WORKERS = 20
 
-# Глобальная коллекция замеров загрузки CPU
-cpu_samples = []
-# Флаг для остановки потока измерения загрузки CPU
+# Глобальные переменные
 stop_cpu_sampling = threading.Event()
-
+cpu_samples = []
+api_calls_count = 0  # счётчик обращений к API CoinGecko
 
 def cpu_sampling():
     """
@@ -78,6 +79,7 @@ def fetch_simple_price(ids_batch):
     ?ids=...&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true
     Возвращает словарь, где ключ = coin_id, значение = dict(...) с нужными данными.
     """
+    global api_calls_count
     ids_str = ",".join(ids_batch)
     params = {
         "ids": ids_str,
@@ -94,7 +96,8 @@ def fetch_simple_price(ids_batch):
     try:
         response = requests.get(COINGECKO_URL, params=params, headers=headers)
         response.raise_for_status()
-        data = response.json()  # Пример:  {"bitcoin": {"usd": 26800, "usd_market_cap": ..., ...}, "litecoin": {...}}
+        data = response.json()  # Пример: {"bitcoin": {...}, "litecoin": {...}}
+        api_calls_count += 1  # Увеличиваем счётчик обращений к API
         return data
     except requests.exceptions.RequestException as e:
         print(f"Ошибка при запросе к /simple/price: {e}")
@@ -199,7 +202,6 @@ def process_batch(batch, batch_number):
     Возвращает (updated_count, zero_count_local)
     """
     print(f"\nОбработка батча {batch_number} (монет в батче: {len(batch)})...")
-    # Получаем словарь {coin_id: {...}, ...}
     coins_data = fetch_simple_price(batch)
     received_count = len(coins_data)
     print(f"Батч {batch_number}: получено данных для {received_count} монет (из {len(batch)})")
@@ -207,23 +209,11 @@ def process_batch(batch, batch_number):
     batch_updated_count = 0
     zero_count_local = 0
 
-    # coins_data выглядит как, например:
-    # {
-    #   "bitcoin": {
-    #     "usd": 26800,
-    #     "usd_market_cap": 5199999990,
-    #     "usd_24h_vol": 9999999,
-    #     "usd_24h_change": -0.45
-    #   },
-    #   ...
-    # }
-
     for coin_id in batch:
         market_data = coins_data.get(coin_id.lower())
         if not market_data:
-            # Нет данных => удаляем монету coin_id из coin_gesco_coins
-            removed = remove_coin_from_db(coin_id)
-            print(f"Батч {batch_number}: нет данных для {coin_id}, монета удалена: {removed}")
+            # Нет данных => удаляем монету coin_id
+            print(f"Батч {batch_number}: нет данных для {coin_id}")
             continue
         # Обновляем основную таблицу
         if update_coin_in_db(coin_id, market_data):
@@ -284,6 +274,10 @@ def alter_table_engine():
 stop_cpu_sampling = threading.Event()
 cpu_samples = []
 
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!! ДЛЯ СЧЁТЧИКА
+api_calls_count = 0
+
+
 def main():
     start_time = time.time()
 
@@ -339,6 +333,9 @@ def main():
     print(f"\nСкрипт работал: {total_time:.2f} секунд.")
     print(f"Средняя загрузка CPU в процессе работы: {avg_cpu:.2f}%.")
     print(f"Общее количество удалённых записей: {deleted_records}")
+
+    # ВЫВОД ОБЩЕГО ЧИСЛА ОБРАЩЕНИЙ К API
+    print(f"Общее число обращений к API CoinGecko: {api_calls_count}")
 
 
 if __name__ == "__main__":

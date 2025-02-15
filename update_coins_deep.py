@@ -1,3 +1,5 @@
+#по всем монеткам данные исторические обновляет, можно раз в сутки запускать
+
 import requests
 import mysql.connector
 import os

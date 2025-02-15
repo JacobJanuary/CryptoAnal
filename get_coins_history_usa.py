@@ -5,6 +5,7 @@ import mysql.connector
 from dotenv import load_dotenv
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import time  # для замера времени скрипта
 
 # Загружаем переменные окружения из файла .env
 load_dotenv()
@@ -33,17 +34,13 @@ specific_dates = {
     "07-12-2024": "07-12-2024"
 }
 
+# Глобальная переменная для подсчёта обращений к API
+api_calls_count = 0
+
 
 def create_history_365_table_full():
     """
     Создает таблицу coin_history_365, если она не существует.
-    Таблица содержит:
-      - coin_id VARCHAR(255) PRIMARY KEY,
-      - min365_usd DECIMAL(20,8) DEFAULT NULL,
-      - min365_date DATE DEFAULT NULL,
-      - max365_usd DECIMAL(20,8) DEFAULT NULL,
-      - max365_date DATE DEFAULT NULL,
-      - дополнительные столбцы для каждой даты из specific_dates.
     """
     additional_columns = ",\n".join([f"`{col}` DECIMAL(20,8) DEFAULT NULL" for col in specific_dates.keys()])
     create_query = f"""
@@ -72,11 +69,10 @@ def create_history_365_table_full():
 
 def fetch_365_data(coin_id):
     """
-    Запрашивает исторические данные цены для монеты coin_id за 365 дней через API CoinGecko.
-    Использует endpoint /coins/{coin_id}/market_chart с параметром days=365.
-    Возвращает кортеж: (min_price, min_date, max_price, max_date).
-    Если данные отсутствуют – возвращает (None, None, None, None).
+    Запрашивает исторические данные цены за 365 дней для монеты coin_id.
+    Возвращает (min_price, min_date, max_price, max_date) или (None, None, None, None).
     """
+    global api_calls_count
     url = f"https://pro-api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
     headers = {
         "accept": "application/json",
@@ -88,6 +84,7 @@ def fetch_365_data(coin_id):
     }
     try:
         response = requests.get(url, headers=headers, params=params)
+        api_calls_count += 1  # увеличиваем счётчик API
         response.raise_for_status()
         data = response.json()
         prices = data.get("prices", [])
@@ -122,10 +119,10 @@ def fetch_365_data(coin_id):
 
 def fetch_history_price(coin_id, date_str):
     """
-    Запрашивает историческую цену для монеты coin_id на дату date_str (формат dd-mm-yyyy)
-    через endpoint /coins/{coin_id}/history.
+    Запрашивает историческую цену монеты coin_id на дату date_str (dd-mm-yyyy).
     Возвращает цену в USD или None, если данные отсутствуют.
     """
+    global api_calls_count
     url = f"https://pro-api.coingecko.com/api/v3/coins/{coin_id}/history"
     headers = {
         "accept": "application/json",
@@ -137,6 +134,7 @@ def fetch_history_price(coin_id, date_str):
     }
     try:
         response = requests.get(url, headers=headers, params=params)
+        api_calls_count += 1  # увеличиваем счётчик API
         response.raise_for_status()
         data = response.json()
         market_data = data.get("market_data")
@@ -153,10 +151,10 @@ def fetch_history_price(coin_id, date_str):
 def get_made_in_usa_coin_ids():
     """
     Возвращает список coin_id из таблицы coin_category_relation,
-    для которых category_id = 'made-in-usa'.
+    где category_id='made-in-usa'.
     """
     coin_ids = []
-    query = "SELECT coin_id FROM coin_category_relation WHERE category_id = 'made-in-usa'"
+    query = "SELECT coin_id FROM coin_category_relation WHERE category_id='made-in-usa'"
     try:
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
@@ -175,26 +173,24 @@ def get_made_in_usa_coin_ids():
 def update_365_full_for_coin(coin_id):
     """
     Для монеты coin_id:
-      - Получает данные по 365-дневному графику (минимальная и максимальная цена с датами).
-      - Для каждой заданной даты из specific_dates запрашивает цену через API CoinGecko.
-      - Выполняет upsert в таблицу coin_history_365, обновляя/вставляя:
-            min365_usd, min365_date, max365_usd, max365_date,
-            а также цену для каждой даты из specific_dates.
+      - Получаем min/max за 365 дней (fetch_365_data).
+      - Для каждой даты из specific_dates запрашиваем цену (fetch_history_price).
+      - Выполняем upsert (INSERT ... ON DUPLICATE KEY UPDATE) в coin_history_365.
     """
-    print(f"Обработка 365-дневных данных для монеты {coin_id}...")
+    print(f"[coin_id={coin_id}] Обработка 365-дневных данных...")
     min_price, min_date, max_price, max_date = fetch_365_data(coin_id)
     if min_price is None or max_price is None:
-        print(f"Нет данных 365 дней для монеты {coin_id}. Пропускаем.")
+        print(f"[coin_id={coin_id}] Нет данных 365 дней. Пропускаем.")
         return
 
-    # Получаем цену для каждой конкретной даты
+    # Получаем цену на каждую дату
     date_prices = {}
     for col, date_str in specific_dates.items():
         price = fetch_history_price(coin_id, date_str)
         date_prices[col] = price
-        print(f"Монета {coin_id}, дата {date_str}: цена = {price}")
+        print(f"[coin_id={coin_id}] Дата {date_str} => цена {price}")
 
-    # Формируем списки столбцов и значений
+    # Списки столбцов и значений
     base_columns = ["min365_usd", "min365_date", "max365_usd", "max365_date"]
     base_values = [min_price, min_date, max_price, max_date]
     additional_columns = list(specific_dates.keys())
@@ -203,28 +199,25 @@ def update_365_full_for_coin(coin_id):
     columns = base_columns + additional_columns
     values = base_values + additional_values
 
-    # Формируем SQL-запрос с upsert
+    # SQL upsert
     cols_formatted = ", ".join([f"`{col}`" for col in columns])
-    num_params = 1 + len(columns)  # 1 для coin_id + количество столбцов
-    placeholders = ", ".join(["%s"] * num_params)
-    update_clause = ", ".join([f"`{col}` = VALUES(`{col}`)" for col in columns])
+    placeholders = ", ".join(["%s"] * (1 + len(columns)))  # 1 для coin_id
+    update_clause = ", ".join([f"`{col}`=VALUES(`{col}`)" for col in columns])
     query = f"""
         INSERT INTO coin_history_365 (coin_id, {cols_formatted})
         VALUES ({placeholders})
         ON DUPLICATE KEY UPDATE {update_clause}
     """
     params = [coin_id] + values
-    print("SQL-запрос:")
-    print(query)
-    print("Число параметров:", len(params))
+
     try:
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
         cursor.execute(query, tuple(params))
         conn.commit()
-        print(f"Обновлены данные 365 дней для монеты {coin_id}: min {min_price} ({min_date}), max {max_price} ({max_date})")
+        print(f"[coin_id={coin_id}] Обновили coin_history_365: min {min_price} ({min_date}), max {max_price} ({max_date})")
     except mysql.connector.Error as e:
-        print(f"Ошибка обновления данных 365 дней для монеты {coin_id}: {e}")
+        print(f"[coin_id={coin_id}] Ошибка обновления данных 365: {e}")
     finally:
         if conn.is_connected():
             cursor.close()
@@ -233,26 +226,32 @@ def update_365_full_for_coin(coin_id):
 
 def process_made_in_usa_coins():
     """
-    Для каждой монеты из категории 'made-in-usa':
-      - Если в таблице coin_history_365 еще нет записи, запрашивает данные по 365-дневному графику
-        и по конкретным датам, затем обновляет таблицу.
+    Для каждой монеты из категории 'made-in-usa' обновляем/вставляем (upsert) данные 365.
     """
     create_history_365_table_full()
     coin_ids = get_made_in_usa_coin_ids()
-    print(f"Найдено {len(coin_ids)} монет категории 'made-in-usa' для обновления данных за 365 дней.")
+    print(f"Найдено {len(coin_ids)} монет категории 'made-in-usa' для обновления (365 дней).")
 
     with ThreadPoolExecutor(max_workers=10) as executor:
-        futures = {executor.submit(update_365_full_for_coin, coin_id): coin_id for coin_id in coin_ids}
+        futures = {executor.submit(update_365_full_for_coin, cid): cid for cid in coin_ids}
         for future in as_completed(futures):
             coin_id = futures[future]
             try:
                 future.result()
             except Exception as e:
-                print(f"Ошибка обработки 365-дневных данных для монеты {coin_id}: {e}")
+                print(f"[coin_id={coin_id}] Ошибка в процессе обновления: {e}")
 
 
 def main():
+    start_time = time.time()
+
     process_made_in_usa_coins()
+
+    end_time = time.time()
+    elapsed = end_time - start_time
+    print("\nСкрипт завершён.")
+    print(f"Всего обращений к API: {api_calls_count}")
+    print(f"Время выполнения скрипта: {elapsed:.2f} секунд.")
 
 
 if __name__ == "__main__":
