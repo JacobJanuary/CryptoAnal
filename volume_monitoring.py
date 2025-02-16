@@ -112,7 +112,7 @@ def main():
                             change_pct = ((new_volume - old_volume) / old_volume) * 100
                             if change_pct > GROWTH_THRESHOLD:
                                 # Формируем ссылку на coingesco, подставляя coin_id
-                                coin_url = f"https://coingesco.com/coins/{coin_id}"
+                                coin_url = f"https://coingecko.com/coins/{coin_id}"
                                 # Формируем сообщение, добавляем значок «🚀»
                                 msg = (
                                     f"🚀  {coin_name} ({coin_symbol}): объём вырос на "
