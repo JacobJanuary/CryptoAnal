@@ -6,20 +6,20 @@ import requests
 import mysql.connector as mc
 from dotenv import load_dotenv
 
-# 1) Загружаем переменные окружения
+# Загружаем переменные окружения
 load_dotenv()
 
-# 2) Конфиги БД
+# Конфигурация БД
 MYSQL_HOST = os.getenv("MYSQL_HOST", "localhost")
 MYSQL_USER = os.getenv("MYSQL_USER", "root")
 MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "password")
 MYSQL_DB = os.getenv("MYSQL_DATABASE", "crypto_db")
 
 db_config = {
-    'host': MYSQL_HOST,
-    'user': MYSQL_USER,
-    'password': MYSQL_PASSWORD,
-    'database': MYSQL_DB
+    "host": MYSQL_HOST,
+    "user": MYSQL_USER,
+    "password": MYSQL_PASSWORD,
+    "database": MYSQL_DB
 }
 
 # Параметры Telegram
@@ -29,13 +29,15 @@ CHAT_ID = int(os.getenv("MY_TELEGRAM_CHAT_ID", "0"))  # например, 123456
 def send_telegram_message(text: str) -> None:
     """Отправляет сообщение text в Telegram-чат CHAT_ID, используя BOT_TOKEN."""
     if not BOT_TOKEN or CHAT_ID == 0:
-        print("[WARN] Не задан токен бота или chat_id, пропускаем отправку.")
+        print("[WARN] Не задан токен бота или chat_id — пропускаем отправку.")
         return
+
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     params = {
         "chat_id": CHAT_ID,
         "text": text
     }
+
     try:
         resp = requests.get(url, params=params)
         resp.raise_for_status()
@@ -43,10 +45,12 @@ def send_telegram_message(text: str) -> None:
     except Exception as e:
         print(f"[ERROR] Telegram сообщение не отправлено: {e}")
 
-# 3) Параметры мониторинга
-CHECK_INTERVAL = 60        # интервал между проверками
-VOLUME_MIN = 100000        # объём, начиная с которого проверяем прирост
-GROWTH_THRESHOLD = 100.0   # прирост (в %) для уведомления
+# Параметры мониторинга
+CHECK_INTERVAL = 6         # интервал между проверками (сек)
+MARKET_CAP_RANK_MIN = 1
+MARKET_CAP_RANK_MAX = 9999
+VOLUME_MIN = 10000
+GROWTH_THRESHOLD = 100.0
 
 def main():
     # Храним время последней обработанной записи
@@ -56,36 +60,39 @@ def main():
 
     while True:
         try:
-            # Сообщаем, что пытаемся подключиться
-            print("[INFO] Пытаемся подключиться к базе...")
             conn = mc.connect(**db_config)
             cursor = conn.cursor(dictionary=True)
-            print("[INFO] Успешно подключились к базе.")
 
-            # Отправляем уведомление в Telegram (только при первом подключении)
             if first_connection:
+                print("[INFO] Успешно подключились к базе.")
                 send_telegram_message("Успешное подключение к базе данных! Начинаем мониторинг объёма.")
                 first_connection = False
 
-            # Достаём новые записи (history_date_time > last_dt)
+            # Получаем новые записи по ограниченному market_cap_rank
             query_new = """
-                SELECT coin_id, volume, price, history_date_time
-                FROM coin_volume_history
-                WHERE history_date_time > %s
-                ORDER BY history_date_time ASC
+                SELECT ch.coin_id,
+                       ch.volume AS new_volume,
+                       ch.price,
+                       ch.history_date_time,
+                       cg.name AS coin_name,
+                       cg.symbol AS coin_symbol,
+                       cg.market_cap_rank
+                FROM coin_volume_history AS ch
+                JOIN coin_gesco_coins AS cg ON cg.id = ch.coin_id
+                WHERE ch.history_date_time > %s
+                  AND cg.market_cap_rank BETWEEN %s AND %s
+                ORDER BY ch.history_date_time ASC
             """
-            cursor.execute(query_new, (last_dt,))
+            cursor.execute(query_new, (last_dt, MARKET_CAP_RANK_MIN, MARKET_CAP_RANK_MAX))
             new_rows = cursor.fetchall()
-
-            if new_rows:
-                print(f"[INFO] Найдено {len(new_rows)} новых записей после {last_dt}.")
 
             for row in new_rows:
                 coin_id = row["coin_id"]
-                new_volume = row["volume"]
+                coin_name = row["coin_name"]
+                coin_symbol = row["coin_symbol"]
+                new_volume = row["new_volume"]
                 new_dt = row["history_date_time"]
 
-                # Если объём > VOLUME_MIN, сравниваем с предыдущим
                 if new_volume and new_volume > VOLUME_MIN:
                     # Ищем предыдущую запись
                     prev_query = """
@@ -98,29 +105,35 @@ def main():
                     """
                     cursor.execute(prev_query, (coin_id, new_dt))
                     prev_row = cursor.fetchone()
+
                     if prev_row:
                         old_volume = prev_row["volume"]
-                        if old_volume and old_volume > 0:
+                        if old_volume and old_volume > VOLUME_MIN:
                             change_pct = ((new_volume - old_volume) / old_volume) * 100
                             if change_pct > GROWTH_THRESHOLD:
-                                msg = (f"[ALERT] Монета {coin_id}: объём вырос на {change_pct:.2f}% "
-                                       f"(старый={old_volume}, новый={new_volume})")
+                                # Формируем ссылку на coingesco, подставляя coin_id
+                                coin_url = f"https://coingesco.com/coins/{coin_id}"
+                                # Формируем сообщение, добавляем значок «🚀»
+                                msg = (
+                                    f"🚀  {coin_name} ({coin_symbol}): объём вырос на "
+                                    f"{change_pct:.2f}% (старый={old_volume}, новый={new_volume})\n"
+                                    f"Ссылка: {coin_url}"
+                                )
                                 print(msg)
                                 send_telegram_message(msg)
 
-                # Обновляем last_dt (берём самую свежую)
+                # Обновляем last_dt
                 if new_dt > last_dt:
                     last_dt = new_dt
 
             cursor.close()
             conn.close()
 
-        except Exception as exc:
-            print("[ERROR] Ошибка в скрипте мониторинга:", traceback.format_exc())
-            # Если при подключении ошибка — при следующей итерации скрипт попробует снова.
-            # Можно отправить Telegram, но рискуем заспамить, если БД недоступна.
+        except Exception:
+            print("[ERROR] Ошибка в скрипте мониторинга:")
+            print(traceback.format_exc())
 
-        print(f"[INFO] Ждем {CHECK_INTERVAL} секунд до следующей проверки.\n")
+        # Ждём до следующей проверки
         time.sleep(CHECK_INTERVAL)
 
 if __name__ == "__main__":
