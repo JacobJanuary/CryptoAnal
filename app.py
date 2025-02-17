@@ -49,7 +49,7 @@ def get_grok_analytics(name, symbol):
         print(f"[get_grok_analytics] Prompt:\n{prompt}")
 
         response = client.messages.create(
-            model="grok-2-1212",
+            model="grok-beta",
             max_tokens=128000,
             messages=[{"role": "user", "content": prompt}]
         )
