@@ -1,5 +1,3 @@
-#обновляет цену и объем, запускать раз в час
-
 import os
 import traceback
 import requests
@@ -70,7 +68,7 @@ def get_all_coin_ids():
 def batch_list(lst, batch_size):
     """Разбивает список lst на батчи по batch_size элементов."""
     for i in range(0, len(lst), batch_size):
-        yield lst[i:i + batch_size]
+        yield lst[i : i + batch_size]
 
 
 def fetch_simple_price(ids_batch):
@@ -104,6 +102,24 @@ def fetch_simple_price(ids_batch):
         return {}
 
 
+def mark_coin_as_dead(coin_id):
+    """
+    Помечает монету в таблице coin_gesco_coins как isDead=1.
+    """
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor()
+        cursor.execute("UPDATE coin_gesco_coins SET isDead=1 WHERE id=%s", (coin_id,))
+        conn.commit()
+        print(f"[INFO] Монета '{coin_id}' помечена isDead=1.")
+    except mysql.connector.Error as e:
+        print(f"[ERROR] Не удалось пометить монету {coin_id} как isDead: {e}")
+    finally:
+        if 'conn' in locals() and conn.is_connected():
+            cursor.close()
+            conn.close()
+
+
 def update_coin_in_db(coin_id, market_data):
     """
     Обновляет запись монеты в таблице coin_gesco_coins по её coin_id.
@@ -113,6 +129,7 @@ def update_coin_in_db(coin_id, market_data):
       - "usd_24h_vol" -> total_volume_usd
       - "usd_24h_change" -> price_change_percentage_24h
     Также обновляем lastupdate = NOW().
+    И устанавливаем isDead=0 (живой), т.к. обновляются валидные поля.
     Возвращает True, если обновление успешно, иначе False.
     """
     current_price = market_data.get("usd")
@@ -129,6 +146,7 @@ def update_coin_in_db(coin_id, market_data):
             market_cap_usd = %s,
             total_volume_usd = %s,
             price_change_percentage_24h = %s,
+            isDead = 0,
             lastupdate = NOW()
         WHERE id = %s
     """
@@ -161,16 +179,15 @@ def insert_volume_history(coin_id, market_data):
       - volume = usd_24h_vol
       - price = usd
       - history_date_time = NOW()
-    Если для монеты не передаются данные по объемам или цене (нулевые значения),
-    запись не вставляется и выводится сообщение.
-    Возвращает True, если вставка успешна, иначе False.
+    Если цена или объем == 0 (или None), выводим сообщение, не вставляем.
+    Возвращает True/False в зависимости от успеха вставки.
     """
     volume = market_data.get("usd_24h_vol", 0)
     price = market_data.get("usd", 0)
 
     # Если цена или объем равны нулю или отсутствуют, не вставляем запись
     if not volume or volume == 0 or not price or price == 0:
-        print(f"Для монеты {coin_id} объем={volume}, цена={price}")
+        print(f"Для монеты {coin_id} объем={volume}, цена={price} => запись не добавлена в history.")
         return False
 
     insert_query = """
@@ -196,13 +213,16 @@ def insert_volume_history(coin_id, market_data):
 def process_batch(batch, batch_number):
     """
     Обрабатывает один батч монет:
-      - запрашивает данные с нового упрощённого API CoinGecko
-      - обновляет данные монет в БД
-      - вставляет историю объемов
-    Возвращает (updated_count, zero_count_local)
+      1) Запрашивает данные с API CoinGecko (/simple/price)
+      2) Для каждой монеты в batch:
+         - Если данных нет => mark_coin_as_dead
+         - Иначе проверяем usd и usd_24h_vol:
+             * если 0 => mark_coin_as_dead
+             * иначе => update_coin_in_db + insert_volume_history
+    Возвращает (updated_count, zero_count_local).
     """
     print(f"\nОбработка батча {batch_number} (монет в батче: {len(batch)})...")
-    coins_data = fetch_simple_price(batch)
+    coins_data = fetch_simple_price(batch)  # dict { 'bitcoin': {...}, 'litecoin': {...} }
     received_count = len(coins_data)
     print(f"Батч {batch_number}: получено данных для {received_count} монет (из {len(batch)})")
 
@@ -210,15 +230,25 @@ def process_batch(batch, batch_number):
     zero_count_local = 0
 
     for coin_id in batch:
+        # market_data для конкретной монеты (lowercase ключ)
         market_data = coins_data.get(coin_id.lower())
         if not market_data:
-            # Нет данных => удаляем монету coin_id
-            print(f"Батч {batch_number}: нет данных для {coin_id}")
+            # Данных нет
+            mark_coin_as_dead(coin_id)
             continue
-        # Обновляем основную таблицу
+
+        # Проверим объём и цену
+        volume = market_data.get("usd_24h_vol", 0)
+        price = market_data.get("usd", 0)
+        if not volume or volume == 0 or not price or price == 0:
+            mark_coin_as_dead(coin_id)
+            zero_count_local += 1
+            continue
+
+        # Иначе обновляем данные
         if update_coin_in_db(coin_id, market_data):
             batch_updated_count += 1
-            # Добавляем запись в coin_volume_history
+            # Попробуем вставить в history
             if not insert_volume_history(coin_id, market_data):
                 zero_count_local += 1
 
@@ -229,7 +259,7 @@ def process_batch(batch, batch_number):
 def delete_old_records():
     """
     Удаляет из таблицы coin_volume_history записи, старше 7 часов.
-    Выводит на экран количество удалённых записей.
+    Выводит количество удалённых записей.
     """
     delete_query = """
         DELETE FROM coin_volume_history
@@ -254,7 +284,7 @@ def delete_old_records():
 
 def alter_table_engine():
     """
-    Выполняет запрос для изменения механизма таблицы coin_volume_history на INNODB.
+    Меняет механизм таблицы coin_volume_history на INNODB.
     """
     alter_query = "ALTER TABLE coin_volume_history ENGINE=INNODB"
     try:
@@ -262,20 +292,13 @@ def alter_table_engine():
         cursor = conn.cursor()
         cursor.execute(alter_query)
         conn.commit()
-        print("ALTER TABLE выполнен: coin_volume_history теперь использует ENGINE=INNODB.")
+        print("ALTER TABLE: coin_volume_history теперь INNODB.")
     except mysql.connector.Error as e:
-        print(f"Ошибка при выполнении ALTER TABLE: {e}")
+        print(f"Ошибка при ALTER TABLE: {e}")
     finally:
         if 'conn' in locals() and conn.is_connected():
             cursor.close()
             conn.close()
-
-
-stop_cpu_sampling = threading.Event()
-cpu_samples = []
-
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!! ДЛЯ СЧЁТЧИКА
-api_calls_count = 0
 
 
 def main():
@@ -292,13 +315,12 @@ def main():
     overall_updated_count = 0
     overall_zero_count = 0
 
-    # Разбиваем список id на батчи по BATCH_SIZE (100)
+    # Разбиваем список id на батчи (например, по 100)
     BATCH_SIZE = 100
     batches = list(batch_list(coin_ids, BATCH_SIZE))
     total_batches = len(batches)
     print(f"Всего батчей: {total_batches}")
 
-    from concurrent.futures import ThreadPoolExecutor, as_completed
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         future_to_batch = {
             executor.submit(process_batch, batch, idx + 1): idx + 1
@@ -311,18 +333,18 @@ def main():
                 overall_updated_count += updated_count
                 overall_zero_count += zero_count
             except Exception as exc:
-                print(f"Батч {batch_number} сгенерировал исключение: {exc}")
+                print(f"Батч {batch_number} вызвал исключение: {exc}")
 
     print(f"\nОбновлено записей всего: {overall_updated_count} из {total_ids}")
-    print(f"Количество монет с нулевым объемом или ценой: {overall_zero_count}")
+    print(f"Количество монет с нулевым объемом или ценой (помечено dead): {overall_zero_count}")
 
-    # Удаляем записи из coin_volume_history, старше 7 часов
+    # Удаляем старые записи
     deleted_records = delete_old_records()
 
-    # Выполняем ALTER TABLE
+    # Меняем ENGINE
     alter_table_engine()
 
-    # Останавливаем поток измерения загрузки CPU
+    # Останавливаем CPU sampling
     stop_cpu_sampling.set()
     cpu_thread.join()
 
@@ -330,13 +352,11 @@ def main():
     total_time = end_time - start_time
 
     avg_cpu = sum(cpu_samples) / len(cpu_samples) if cpu_samples else 0
+
     print(f"\nСкрипт работал: {total_time:.2f} секунд.")
-    print(f"Средняя загрузка CPU в процессе работы: {avg_cpu:.2f}%.")
+    print(f"Средняя загрузка CPU: {avg_cpu:.2f}%.")
     print(f"Общее количество удалённых записей: {deleted_records}")
-
-    # ВЫВОД ОБЩЕГО ЧИСЛА ОБРАЩЕНИЙ К API
     print(f"Общее число обращений к API CoinGecko: {api_calls_count}")
-
 
 if __name__ == "__main__":
     main()
