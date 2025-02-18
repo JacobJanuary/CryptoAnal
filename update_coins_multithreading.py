@@ -52,7 +52,7 @@ def get_all_coin_ids():
     try:
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
-        query = "SELECT id FROM coin_gesco_coins"
+        query = "SELECT id FROM coin_gesco_coins WHERE isDead = False"
         cursor.execute(query)
         rows = cursor.fetchall()
         coin_ids = [row[0] for row in rows]
