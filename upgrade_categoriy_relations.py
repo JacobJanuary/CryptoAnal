@@ -137,7 +137,7 @@ def get_coin_ids_for_update():
         cursor = conn.cursor()
         query = """
             SELECT id FROM coin_gesco_coins
-            WHERE id NOT IN (SELECT DISTINCT coin_id FROM coin_category_relation)
+            WHERE id NOT IN (SELECT DISTINCT coin_id FROM coin_category_relation) AND isDead = False
         """
         cursor.execute(query)
         rows = cursor.fetchall()
@@ -158,12 +158,12 @@ def remove_coin_from_db(coin_id):
     try:
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM coin_gesco_coins WHERE id = %s", (coin_id,))
+        cursor.execute("UPDATE coin_gesco_coins SET isDead=true WHERE id = %s", (coin_id,))
         conn.commit()
         deleted_rows = cursor.rowcount
         return deleted_rows > 0
     except mysql.connector.Error as e:
-        print(f"Ошибка при удалении монеты {coin_id}: {e}")
+        print(f"Ошибка при убитии монеты {coin_id}: {e}")
         return False
     finally:
         if conn.is_connected():
@@ -183,7 +183,7 @@ def process_coin(coin_id):
     coin_data = fetch_coin_details(coin_id)
     if not coin_data:
         removed = remove_coin_from_db(coin_id)
-        print(f"Нет данных для монеты {coin_id} -> монета удалена: {removed}")
+        print(f"Нет данных для монеты {coin_id} -> монета помечена как умершая: {removed}")
         return False
 
     added_count = update_coin_categories(coin_data)
