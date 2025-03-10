@@ -590,12 +590,11 @@ function showCoinDetails(coinId) {
         html += `<p><strong>ATL:</strong> $${atlVal}, ${atlPct}%, ${atlDate}</p>`;
 
         // High365 / Low365
-        let max365 = data.max365_usd || "N/A";
-        let max365Date = data.max365_date || "N/A";
-        let min365 = data.min365_usd || "N/A";
-        let min365Date = data.min365_date || "N/A";
-        html += `<p><strong>High365:</strong> $${max365} (${max365Date}), 
-                 <strong>Low365:</strong> $${min365} (${min365Date})</p>`;
+        let percMaxToCurrent = data.perc_change_max_to_current ? data.perc_change_max_to_current.toFixed(2) : "N/A";
+        let percMinToMax = data.perc_change_min_to_max ? data.perc_change_min_to_max.toFixed(2) : "N/A";
+
+        html += `<p><strong>High23-25:</strong> $${max2325} (${max2325Date}) ${percMaxToCurrent}%</p>`;
+        html += `<p><strong>Low23-25:</strong> $${min2325} (${min2325Date}) ${percMinToMax}%</p>`;
 
         // watchlist_portfolio_users
         if (data.watchlist_portfolio_users !== undefined && data.watchlist_portfolio_users !== null) {

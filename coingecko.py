@@ -404,6 +404,7 @@ def coin_details(coin_id):
                 max_price_oct23_mar25,
                 max_date_oct23_mar25,
                 perc_change_max_to_current,
+                perc_change_min_to_max,
                 volume_spikes,
                 anomalous_buybacks
             FROM coin_history_new365
@@ -414,17 +415,13 @@ def coin_details(coin_id):
 
         if row_hist:
             coin.update(row_hist)
-            if coin['min_price_oct23_mar25'] and coin['current_price_usd']:
-                perc_change_min_to_current = ((coin['current_price_usd'] - coin['min_price_oct23_mar25']) / coin['min_price_oct23_mar25']) * 100
-                coin['perc_change_min_to_current'] = perc_change_min_to_current
-            else:
-                coin['perc_change_min_to_current'] = None
         else:
             coin['min_price_oct23_mar25'] = None
             coin['max_price_oct23_mar25'] = None
             coin['min_date_oct23_mar25'] = None
             coin['max_date_oct23_mar25'] = None
             coin['perc_change_max_to_current'] = None
+            coin['perc_change_min_to_max'] = None
             coin['volume_spikes'] = '[]'
             coin['anomalous_buybacks'] = '[]'
             coin['perc_change_min_to_current'] = None
