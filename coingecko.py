@@ -369,14 +369,6 @@ def favourites():
 
 @app.route("/coin_details/<coin_id>", methods=["GET"])
 def coin_details(coin_id):
-    """
-    Возвращает подробные данные по монете:
-      - AI_text, AI_invest
-      - market_cap_usd, market_cap_rank, ath_usd, ath_change_percentage_usd, ath_date_usd
-      - atl_usd, atl_change_percentage_usd, atl_date_usd
-      - total_volume_usd, current_price_usd, high_24h_usd, low_24h_usd
-      - данные из coin_history_365 (max365_usd, max365_date, min365_usd, min365_date, и конкретные даты)
-    """
     try:
         conn = mc.connect(**db_config)
         cursor = conn.cursor(dictionary=True)
@@ -407,16 +399,14 @@ def coin_details(coin_id):
 
         query_hist = """
             SELECT
-              max365_usd, max365_date,
-              min365_usd, min365_date,
-              `02-02-2025` AS d_02_02_25,
-              `03-02-2025` AS d_03_02_25,
-              `04-02-2025` AS d_04_02_25,
-              `04-08-2024` AS d_04_08_24,
-              `05-08-2024` AS d_05_08_24,
-              `06-08-2024` AS d_06_08_24,
-              `07-12-2024` AS d_07_12_24
-            FROM coin_history_365
+                min_price_oct23_mar25,
+                min_date_oct23_mar25,
+                max_price_oct23_mar25,
+                max_date_oct23_mar25,
+                perc_change_max_to_current,
+                volume_spikes,
+                anomalous_buybacks
+            FROM coin_history_new365
             WHERE coin_id = %s
         """
         cursor.execute(query_hist, (coin_id,))
@@ -424,18 +414,20 @@ def coin_details(coin_id):
 
         if row_hist:
             coin.update(row_hist)
+            if coin['min_price_oct23_mar25'] and coin['current_price_usd']:
+                perc_change_min_to_current = ((coin['current_price_usd'] - coin['min_price_oct23_mar25']) / coin['min_price_oct23_mar25']) * 100
+                coin['perc_change_min_to_current'] = perc_change_min_to_current
+            else:
+                coin['perc_change_min_to_current'] = None
         else:
-            coin["max365_usd"] = None
-            coin["max365_date"] = None
-            coin["min365_usd"] = None
-            coin["min365_date"] = None
-            coin["d_02_02_25"] = None
-            coin["d_03_02_25"] = None
-            coin["d_04_02_25"] = None
-            coin["d_04_08_24"] = None
-            coin["d_05_08_24"] = None
-            coin["d_06_08_24"] = None
-            coin["d_07_12_24"] = None
+            coin['min_price_oct23_mar25'] = None
+            coin['max_price_oct23_mar25'] = None
+            coin['min_date_oct23_mar25'] = None
+            coin['max_date_oct23_mar25'] = None
+            coin['perc_change_max_to_current'] = None
+            coin['volume_spikes'] = '[]'
+            coin['anomalous_buybacks'] = '[]'
+            coin['perc_change_min_to_current'] = None
 
         cursor.close()
         conn.close()
@@ -447,25 +439,18 @@ def coin_details(coin_id):
 
 @app.route("/made_in_usa")
 def made_in_usa():
-    """
-    Отображает страницу с монетами категории 'made-in-usa'.
-    Поддерживаемые поля для сортировки:
-       name, market_cap_rank, price_change_percentage_24h, market_cap, volume_24h.
-    """
     try:
         sort_by = request.args.get('sort_by', 'market_cap_rank')
         order = request.args.get('order', 'asc')
 
-        # Расширяем словарь полей для сортировки
         valid_sort_fields = {
             'name': 'c.name',
             'market_cap_rank': 'c.market_cap_rank',
             'price_change_percentage_24h': 'c.price_change_percentage_24h',
-            'market_cap': 'c.market_cap_usd',       # <-- новое поле
-            'volume_24h': 'c.total_volume_usd'      # <-- новое поле
+            'market_cap': 'c.market_cap_usd',
+            'volume_24h': 'c.total_volume_usd'
         }
 
-        # Проверяем, не запросили ли недопустимое поле
         if sort_by not in valid_sort_fields:
             sort_by = 'market_cap_rank'
         if order not in ['asc', 'desc']:
@@ -476,7 +461,6 @@ def made_in_usa():
         conn = mc.connect(**db_config)
         cursor = conn.cursor(dictionary=True)
 
-        # Выбираем монеты из категории 'made-in-usa'
         query = f"""
             SELECT c.id,
                    c.name,
@@ -486,6 +470,8 @@ def made_in_usa():
                    c.price_change_percentage_24h,
                    c.market_cap_usd,
                    c.total_volume_usd,
+                   h.min_price_oct23_mar25,
+                   h.max_price_oct23_mar25,
                    (
                      SELECT cc.name
                      FROM coin_category_relation ccr
@@ -496,6 +482,7 @@ def made_in_usa():
                    ) AS main_category
             FROM coin_gesco_coins c
             JOIN coin_category_relation r ON c.id = r.coin_id
+            LEFT JOIN coin_history_new365 h ON c.id = h.coin_id
             WHERE r.category_id = 'made-in-usa' AND c.market_cap_usd>=10000000 and c.total_volume_usd>=100000
             {order_by_clause}
         """
@@ -504,13 +491,9 @@ def made_in_usa():
         cursor.close()
         conn.close()
 
-        # Кол-во монет
         total_count = len(rows)
-
-        # Определяем противоположное направление сортировки (asc <-> desc)
         opposite_order = 'desc' if order == 'asc' else 'asc'
 
-        # Рендерим шаблон made_in_usa.html
         return render_template(
             "made_in_usa.html",
             coins=rows,

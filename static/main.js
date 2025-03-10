@@ -382,19 +382,82 @@ function showCoinDetails(coinId) {
         if (data.error) {
             throw new Error(data.error);
         }
-        // Заголовок
         modalTitle.textContent = `${data.name} (${data.symbol})`;
 
         let html = "";
 
+        // Информация по монете
+        let mcMln = data.market_cap_usd ? (data.market_cap_usd / 1e6).toFixed(2) : "N/A";
+        let rank = data.market_cap_rank || "N/A";
+        let volMln = data.total_volume_usd ? (data.total_volume_usd / 1e6).toFixed(2) : "N/A";
+        let cPrice = data.current_price_usd ? data.current_price_usd.toFixed(2) : "N/A";
+        let high24 = data.high_24h_usd ? data.high_24h_usd.toFixed(2) : "N/A";
+        let low24 = data.low_24h_usd ? data.low_24h_usd.toFixed(2) : "N/A";
+        let athVal = data.ath_usd ? data.ath_usd.toFixed(2) : "N/A";
+        let athPct = data.ath_change_percentage_usd ? data.ath_change_percentage_usd.toFixed(2) : "N/A";
+        let athDate = data.ath_date_usd || "N/A";
+        let atlVal = data.atl_usd ? data.atl_usd.toFixed(2) : "N/A";
+        let atlPct = data.atl_change_percentage_usd ? data.atl_change_percentage_usd.toFixed(2) : "N/A";
+        let atlDate = data.atl_date_usd || "N/A";
+        let max2325 = data.max_price_oct23_mar25 ? data.max_price_oct23_mar25.toFixed(2) : "N/A";
+        let max2325Date = data.max_date_oct23_mar25 || "N/A";
+        let percMaxToCurrent = data.perc_change_max_to_current ? data.perc_change_max_to_current.toFixed(2) : "N/A";
+        let min2325 = data.min_price_oct23_mar25 ? data.min_price_oct23_mar25.toFixed(2) : "N/A";
+        let min2325Date = data.min_date_oct23_mar25 || "N/A";
+        let percMinToCurrent = data.perc_change_min_to_current ? data.perc_change_min_to_current.toFixed(2) : "N/A";
+
+        html += `<h3>Информация по монете</h3>`;
+        html += `<p><strong>Market Cap:</strong> ${mcMln} млн. (Rank: ${rank})</p>`;
+        html += `<p><strong>Volume:</strong> ${volMln} млн. | <strong>Price:</strong> $${cPrice}</p>`;
+        html += `<p>24h Low: $${low24}, 24h High: $${high24}</p>`;
+        html += `<p><strong>ATH:</strong> $${athVal}, ${athPct}%, ${athDate}</p>`;
+        html += `<p><strong>ATL:</strong> $${atlVal}, ${atlPct}%, ${atlDate}</p>`;
+        html += `<p><strong>High23-25:</strong> $${max2325} (${max2325Date}) ${percMaxToCurrent}%</p>`;
+        html += `<p><strong>Low23-25:</strong> $${min2325} (${min2325Date}) ${percMinToCurrent}%</p>`;
+
+        // Аномальные объемы
+        let volumeSpikes = [];
+        try {
+            volumeSpikes = JSON.parse(data.volume_spikes || '[]');
+        } catch (e) {
+            console.error("Error parsing volume_spikes:", e);
+        }
+        if (volumeSpikes.length > 0) {
+            html += `<h3>Аномальные объемы</h3>`;
+            html += `<table style="border-collapse: collapse; width: 100%;"><tr><th style="border: 1px solid #ddd; padding: 8px;">Date</th><th style="border: 1px solid #ddd; padding: 8px;">Volume</th></tr>`;
+            volumeSpikes.forEach(spike => {
+                html += `<tr><td style="border: 1px solid #ddd; padding: 8px;">${spike.date}</td><td style="border: 1px solid #ddd; padding: 8px;">${spike.volume.toLocaleString()}</td></tr>`;
+            });
+            html += `</table>`;
+        } else {
+            html += `<p><strong>Аномальные объемы:</strong> Нет данных</p>`;
+        }
+
+        // Аномальная волатильность
+        let buybacks = [];
+        try {
+            buybacks = JSON.parse(data.anomalous_buybacks || '[]');
+        } catch (e) {
+            console.error("Error parsing anomalous_buybacks:", e);
+        }
+        if (buybacks.length > 0) {
+            html += `<h3>Аномальная волатильность</h3>`;
+            html += `<table style="border-collapse: collapse; width: 100%;"><tr><th style="border: 1px solid #ddd; padding: 8px;">Date</th><th style="border: 1px solid #ddd; padding: 8px;">Price Change (%)</th><th style="border: 1px solid #ddd; padding: 8px;">Volume</th></tr>`;
+            buybacks.forEach(bb => {
+                html += `<tr><td style="border: 1px solid #ddd; padding: 8px;">${bb.date}</td><td style="border: 1px solid #ddd; padding: 8px;">${bb.price_change.toFixed(2)}</td><td style="border: 1px solid #ddd; padding: 8px;">${bb.volume.toLocaleString()}</td></tr>`;
+            });
+            html += `</table>`;
+        } else {
+            html += `<p><strong>Аномальная волатильность:</strong> Нет данных</p>`;
+        }
+
         // AI Аналитика
-        html += formatAiBlock("AI Аналитика", data.AI_text, 10);
+        html += `<h3>AI Аналитика</h3>`;
+        html += formatAnalyticsContent(data.AI_text || "Нет данных");
 
         // AI Фонды
-        html += formatAiBlock("AI Фонды", data.AI_invest, 5);
-
-        // Далее те же поля Market Cap, Rank, ATH, ATL, ...
-        // ...
+        html += `<h3>AI Фонды</h3>`;
+        html += formatAnalyticsContent(data.AI_invest || "Нет данных");
 
         modalContent.innerHTML = html;
         modalLoading.style.display = 'none';
