@@ -152,21 +152,24 @@ def get_coin_ids_for_update():
 
 def remove_coin_from_db(coin_id):
     """
-    Удаляет монету из таблицы coin_gesco_coins по coin_id.
-    Возвращает True, если монета была удалена, иначе False.
+    Ранее функция удаляла монету из таблицы coin_gesco_coins,
+    теперь только помечает её как isDead=1.
+
+    Возвращает True, если монета помечена "мертвой" (isDead=1), иначе False.
     """
     try:
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
-        cursor.execute("UPDATE coin_gesco_coins SET isDead=true WHERE id = %s", (coin_id,))
+        # Вместо DELETE теперь делаем UPDATE isDead=1
+        cursor.execute("UPDATE coin_gesco_coins SET isDead=1 WHERE id=%s", (coin_id,))
         conn.commit()
-        deleted_rows = cursor.rowcount
-        return deleted_rows > 0
+        updated_rows = cursor.rowcount
+        return updated_rows > 0
     except mysql.connector.Error as e:
-        print(f"Ошибка при убитии монеты {coin_id}: {e}")
+        print(f"Ошибка при пометке монеты {coin_id} isDead=1: {e}")
         return False
     finally:
-        if conn.is_connected():
+        if 'conn' in locals() and conn.is_connected():
             cursor.close()
             conn.close()
 

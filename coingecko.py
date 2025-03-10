@@ -496,7 +496,7 @@ def made_in_usa():
                    ) AS main_category
             FROM coin_gesco_coins c
             JOIN coin_category_relation r ON c.id = r.coin_id
-            WHERE r.category_id = 'made-in-usa'
+            WHERE r.category_id = 'made-in-usa' AND c.market_cap_usd>=10000000 and c.total_volume_usd>=100000
             {order_by_clause}
         """
         cursor.execute(query)
