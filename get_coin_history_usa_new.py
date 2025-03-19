@@ -39,7 +39,7 @@ def create_history_365_table_full():
         min_date_oct23_mar25 DATE DEFAULT NULL,
         max_price_oct23_mar25 DECIMAL(20,8) DEFAULT NULL,
         max_date_oct23_mar25 DATE DEFAULT NULL,
-        perc_change_min_to_max DECIMAL(10,2) DEFAULT NULL,
+        perc_change_min_to_current DECIMAL(10,2) DEFAULT NULL,
         perc_change_max_to_current DECIMAL(10,2) DEFAULT NULL,
         volume_spikes TEXT DEFAULT NULL,
         anomalous_buybacks TEXT DEFAULT NULL
@@ -211,7 +211,7 @@ def update_365_full_for_coin(coin_id, start_date, end_date):
         return
 
     # Вычисляем процентные изменения
-    perc_change_min_to_max = ((max_price - min_price) / min_price) * 100 if min_price else None
+    perc_change_min_to_current = ((current_price - min_price) / min_price) * 100 if min_price else None
     perc_change_max_to_current = ((current_price - max_price) / max_price) * 100 if max_price else None
 
     # Преобразуем списки в JSON
@@ -221,12 +221,12 @@ def update_365_full_for_coin(coin_id, start_date, end_date):
     # SQL upsert
     columns = [
         "trade_launch_date", "min_price_oct23_mar25", "min_date_oct23_mar25",
-        "max_price_oct23_mar25", "max_date_oct23_mar25", "perc_change_min_to_max",
+        "max_price_oct23_mar25", "max_date_oct23_mar25", "perc_change_min_to_current",
         "perc_change_max_to_current", "volume_spikes", "anomalous_buybacks"
     ]
     values = [
         trade_launch_date, min_price, min_date, max_price, max_date,
-        perc_change_min_to_max, perc_change_max_to_current, volume_spikes_json, anomalous_buybacks_json
+        perc_change_min_to_current, perc_change_max_to_current, volume_spikes_json, anomalous_buybacks_json
     ]
     cols_formatted = ", ".join([f"`{col}`" for col in columns])
     placeholders = ", ".join(["%s"] * (1 + len(columns)))

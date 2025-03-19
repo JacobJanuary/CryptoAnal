@@ -404,7 +404,7 @@ def coin_details(coin_id):
                 max_price_oct23_mar25,
                 max_date_oct23_mar25,
                 perc_change_max_to_current,
-                perc_change_min_to_max,
+                perc_change_min_to_current,
                 volume_spikes,
                 anomalous_buybacks
             FROM coin_history_new365
@@ -421,10 +421,9 @@ def coin_details(coin_id):
             coin['min_date_oct23_mar25'] = None
             coin['max_date_oct23_mar25'] = None
             coin['perc_change_max_to_current'] = None
-            coin['perc_change_min_to_max'] = None
+            coin['perc_change_min_to_current'] = None
             coin['volume_spikes'] = '[]'
             coin['anomalous_buybacks'] = '[]'
-            coin['perc_change_min_to_current'] = None
 
         cursor.close()
         conn.close()
