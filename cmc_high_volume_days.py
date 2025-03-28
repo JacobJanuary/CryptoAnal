@@ -88,7 +88,7 @@ def fetch_cryptocurrencies_from_db(conn):
     cursor.execute("""
     SELECT id, name, symbol 
     FROM cmc_crypto 
-    WHERE volume_24h > 0 AND high_volume_days=0
+    WHERE volume_24h > 0
     ORDER BY cmc_rank 
     """)
 
@@ -239,6 +239,7 @@ def save_analysis_results(conn, results):
     update_sql = '''
     UPDATE cmc_crypto
     SET high_volume_days = %s,
+        total_days = %s,
         min_365d_price = %s,
         min_365d_date = %s,
         max_365d_price = %s,
@@ -249,6 +250,7 @@ def save_analysis_results(conn, results):
     values = [
         (
             result['high_volume_days'],
+            result['total_days'],
             result['min_price'],
             result['min_price_date'],
             result['max_price'],
