@@ -88,7 +88,7 @@ def fetch_cryptocurrencies_from_db(conn):
     cursor.execute("""
     SELECT id, name, symbol 
     FROM cmc_crypto 
-    WHERE volume_24h > 0
+    WHERE volume_24h > 0 AND high_volume_days=0
     ORDER BY cmc_rank 
     """)
 
