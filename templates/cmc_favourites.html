@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Favorite Coins</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cmc-style.css') }}">
+</head>
+<body>
+    <!-- Navigation buttons -->
+    <div class="navigation-buttons">
+        <button onclick="window.location.href='/'">Back to Main List</button>
+    </div>
+
+    <h1>Favorite Coins</h1>
+
+    {% if coins %}
+    <div id="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>
+                        <a href="{{ url_for('favourites', sort_by='name', order=opposite_order if current_sort == 'name' else 'asc') }}">
+                            Name (Symbol)
+                            {% if current_sort == 'name' %}
+                                <span class="sort-arrow">
+                                    {% if current_order == 'asc' %}▲{% else %}▼{% endif %}
+                                </span>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="{{ url_for('favourites', sort_by='market_cap_rank', order=opposite_order if current_sort == 'market_cap_rank' else 'asc') }}">
+                            Rank
+                            {% if current_sort == 'market_cap_rank' %}
+                                <span class="sort-arrow">
+                                    {% if current_order == 'asc' %}▲{% else %}▼{% endif %}
+                                </span>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="{{ url_for('favourites', sort_by='price_change_percentage_24h', order=opposite_order if current_sort == 'price_change_percentage_24h' else 'asc') }}">
+                            24h Change
+                            {% if current_sort == 'price_change_percentage_24h' %}
+                                <span class="sort-arrow">
+                                    {% if current_order == 'asc' %}▲{% else %}▼{% endif %}
+                                </span>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>Price</th>
+                    <th>Category</th>
+                    <th>Details</th>
+                    <th>Remove</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for coin in coins %}
+                <tr>
+                    <td>{{ coin.name }} ({{ coin.symbol }})</td>
+                    <td>{{ coin.market_cap_rank }}</td>
+                    <td class="{% if coin.price_change_percentage_24h > 0 %}positive-change{% elif coin.price_change_percentage_24h < 0 %}negative-change{% endif %}">
+                        {{ coin.price_change_percentage_24h|safe_round(2) }}%
+                    </td>
+                    <td>${{ coin.current_price_usd|safe_round(4) }}</td>
+                    <td>
+                        {% if coin.main_category %}
+                           {{ coin.main_category }}
+                        {% else %}
+                           N/A
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button onclick="showCoinDetails('{{ coin.id }}')">Details</button>
+                    </td>
+                    <td>
+                        <button onclick="toggleFavorite('{{ coin.id }}', true)" class="favorite-active">★</button>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="total-count">Total: {{ coins|length }} coins</p>
+    {% else %}
+    <p class="no-data">No favorite coins yet</p>
+    {% endif %}
+
+    <!-- Modal window -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <h3 id="modal-title"></h3>
+            <div id="modal-loading">
+                <div class="loader"></div>
+                <p>Loading data. Please wait...</p>
+            </div>
+            <div id="modal-content-data" style="display:none;"></div>
+            <button id="close-modal">Close</button>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='cmc-main.js') }}"></script>
+</body>
+</html>

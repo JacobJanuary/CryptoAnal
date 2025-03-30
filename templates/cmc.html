@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CoinMarketCap Explorer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cmc-style.css') }}">
+</head>
+<body>
+    <!-- Navigation buttons -->
+    <div class="navigation-buttons">
+        <button onclick="window.location.href='/cmc_favourites'">Show favorites</button>
+        <button id="toggle-filter-btn" onclick="toggleCoinFilter()">
+            {% if is_filtered %}Show all coins{% else %}Hide low cap coins{% endif %}
+        </button>
+    </div>
+
+    <!-- Category header -->
+    <h1>{{ current_category_name }} ({{ crypto_data|length }} coins)</h1>
+
+    <!-- Category navigation -->
+    <div class="categories-container">
+        {% for category in top_categories %}
+            <a href="/?category={{ category.id }}{% if is_filtered %}&filtered=true{% endif %}" class="category-button {% if category.id == current_category_id %}active{% endif %}">
+                {{ category.name }}
+            </a>
+        {% endfor %}
+    </div>
+
+    <!-- Main content -->
+    {% if crypto_data %}
+        <div id="table-container">
+            <table id="cryptoTable">
+                <thead>
+                    <tr>
+                        <th><a href="/?category={{ current_category_id }}&sort_by=name&order={% if current_sort == 'name' and current_order == 'asc' %}desc{% else %}asc{% endif %}{% if is_filtered %}&filtered=true{% endif %}">Name (Symbol)
+                            {% if current_sort == 'name' %}<span class="sort-arrow">{% if current_order == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a></th>
+                        <th><a href="/?category={{ current_category_id }}&sort_by=market_cap_rank&order={% if current_sort == 'market_cap_rank' and current_order == 'asc' %}desc{% else %}asc{% endif %}{% if is_filtered %}&filtered=true{% endif %}">Rank
+                            {% if current_sort == 'market_cap_rank' %}<span class="sort-arrow">{% if current_order == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a></th>
+                        <th><a href="/?category={{ current_category_id }}&sort_by=price_change_percentage_24h&order={% if current_sort == 'price_change_percentage_24h' and current_order == 'asc' %}desc{% else %}asc{% endif %}{% if is_filtered %}&filtered=true{% endif %}">24h Change
+                            {% if current_sort == 'price_change_percentage_24h' %}<span class="sort-arrow">{% if current_order == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a></th>
+                        <th><a href="/?category={{ current_category_id }}&sort_by=market_cap&order={% if current_sort == 'market_cap' and current_order == 'asc' %}desc{% else %}asc{% endif %}{% if is_filtered %}&filtered=true{% endif %}">Market Cap
+                            {% if current_sort == 'market_cap' %}<span class="sort-arrow">{% if current_order == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a></th>
+                        <th><a href="/?category={{ current_category_id }}&sort_by=volume_24h&order={% if current_sort == 'volume_24h' and current_order == 'asc' %}desc{% else %}asc{% endif %}{% if is_filtered %}&filtered=true{% endif %}">Volume
+                            {% if current_sort == 'volume_24h' %}<span class="sort-arrow">{% if current_order == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a></th>
+                        <th>Price</th>
+                        <th>Category</th>
+                        <th>Min Price</th>
+                        <th>Max Price</th>
+                        <th>Details</th>
+                        <th>Favorite</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for crypto in crypto_data %}
+                        <tr data-coin-id="{{ crypto.coin_id }}" data-categories="{{ crypto.categories_str }}">
+                            <td>{{ crypto.name }} ({{ crypto.symbol }})</td>
+                            <td>{{ crypto.market_cap_rank }}</td>
+                            <td class="{% if crypto.price_change_percentage_24h > 0 %}positive-change{% elif crypto.price_change_percentage_24h < 0 %}negative-change{% endif %}">
+                                {{ crypto.price_change_percentage_24h|safe_round(2) }}%
+                            </td>
+                            <td>{% if crypto.market_cap %}${{ (crypto.market_cap / 1000000)|round(2) }}M{% else %}N/A{% endif %}</td>
+                            <td>{% if crypto.total_volume_usd %}${{ (crypto.total_volume_usd / 1000000)|round(2) }}M{% else %}N/A{% endif %}</td>
+                            <td>${{ crypto.current_price_usd|safe_round(4) }}</td>
+                            <td>{% if crypto.main_category %}{{ crypto.main_category }}{% else %}N/A{% endif %}</td>
+                            <td>{{ crypto.min_365d_price|safe_round(4) if crypto.min_365d_price else 'N/A' }}</td>
+                            <td>{{ crypto.max_365d_price|safe_round(4) if crypto.max_365d_price else 'N/A' }}</td>
+                            <td><button onclick="showCoinDetails('{{ crypto.coin_id }}')">Details</button></td>
+                            <td><button onclick="toggleFavorite('{{ crypto.coin_id }}', {{ 1 if crypto.isFavourites else 0 }})"
+                                    class="{% if crypto.isFavourites %}favorite-active{% endif %} favorite-button">
+                                    {% if crypto.isFavourites %}★{% else %}☆{% endif %}
+                                </button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="no-data">No data to display.</p>
+    {% endif %}
+
+    <!-- Modal window -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <h3 id="modal-title"></h3>
+            <div id="modal-loading">
+                <div class="loader"></div>
+                <p>Loading data. Please wait...</p>
+            </div>
+            <div id="modal-content-data" style="display: none;"></div>
+            <button id="close-modal">Close</button>
+        </div>
+    </div>
+
+    <!-- Tooltip for categories -->
+    <div id="category-tooltip"></div>
+
+    <script>
+    // Include functions directly in HTML to avoid loading issues
+
+    // Toggle favorite status
+    function toggleFavorite(coinId, currentVal) {
+        // Convert to boolean if needed
+        if (currentVal === 1) currentVal = true;
+        if (currentVal === 0) currentVal = false;
+
+        const newVal = !currentVal;
+
+        // Change button appearance immediately
+        const button = document.querySelector(`button[onclick*="toggleFavorite('${coinId}"]`);
+        if (button) {
+            if (newVal) {
+                button.innerHTML = '★';
+                button.classList.add('favorite-active');
+            } else {
+                button.innerHTML = '☆';
+                button.classList.remove('favorite-active');
+            }
+        }
+
+        // Send request to server
+        fetch('/toggle_favourite', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                id: coinId,
+                isFavourites: newVal
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                alert(`Error: ${data.error}`);
+                // Revert UI on error
+                if (button) {
+                    if (currentVal) {
+                        button.innerHTML = '★';
+                        button.classList.add('favorite-active');
+                    } else {
+                        button.innerHTML = '☆';
+                        button.classList.remove('favorite-active');
+                    }
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error toggling favorite:', error);
+            alert(`An error occurred: ${error.message}`);
+            // Revert UI on error
+            if (button) {
+                if (currentVal) {
+                    button.innerHTML = '★';
+                    button.classList.add('favorite-active');
+                } else {
+                    button.innerHTML = '☆';
+                    button.classList.remove('favorite-active');
+                }
+            }
+        });
+    }
+
+    // Show coin details in modal
+    function showCoinDetails(coinId) {
+        const modal = document.getElementById('modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalContent = document.getElementById('modal-content-data');
+        const modalLoading = document.getElementById('modal-loading');
+
+        modalTitle.textContent = "Loading...";
+        modalContent.innerHTML = "";
+        modalLoading.style.display = 'block';
+        modalContent.style.display = 'none';
+        modal.style.display = 'block';
+
+        fetch(`/coin_details/${coinId}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                // Set modal title
+                modalTitle.textContent = `${data.name} (${data.symbol})`;
+
+                // Create HTML content
+                let html = "";
+
+                // Coin information section
+                let mcMln = data.market_cap ? (data.market_cap / 1e6).toFixed(2) : "N/A";
+                let rank = data.market_cap_rank || "N/A";
+                let volMln = data.total_volume_usd ? (data.total_volume_usd / 1e6).toFixed(2) : "N/A";
+                let cPrice = data.current_price_usd ? parseFloat(data.current_price_usd).toFixed(4) : "N/A";
+                let athVal = data.ath_usd ? parseFloat(data.ath_usd).toFixed(4) : "N/A";
+                let atlVal = data.atl_usd ? parseFloat(data.atl_usd).toFixed(4) : "N/A";
+
+                // Price changes
+                let h1Change = data.percent_change_1h ? parseFloat(data.percent_change_1h).toFixed(2) : "N/A";
+                let h24Change = data.price_change_percentage_24h ? parseFloat(data.price_change_percentage_24h).toFixed(2) : "N/A";
+                let d7Change = data.percent_change_7d ? parseFloat(data.percent_change_7d).toFixed(2) : "N/A";
+                let d30Change = data.percent_change_30d ? parseFloat(data.percent_change_30d).toFixed(2) : "N/A";
+
+                // Historical data
+                let max365 = data.max_365d_price ? parseFloat(data.max_365d_price).toFixed(4) : "N/A";
+                let max365Date = data.max_365d_date ? new Date(data.max_365d_date).toLocaleDateString() : "N/A";
+                let percMaxToCurrent = data.perc_change_max_to_current ? parseFloat(data.perc_change_max_to_current).toFixed(2) : "N/A";
+                let min365 = data.min_365d_price ? parseFloat(data.min_365d_price).toFixed(4) : "N/A";
+                let min365Date = data.min_365d_date ? new Date(data.min_365d_date).toLocaleDateString() : "N/A";
+                let percMinToCurrent = data.perc_change_min_to_current ? parseFloat(data.perc_change_min_to_current).toFixed(2) : "N/A";
+
+                // Build sections
+                html += `<h3>Coin Information</h3>`;
+                html += `<p><strong>Market Cap:</strong> ${mcMln}M (Rank: ${rank})</p>`;
+                html += `<p><strong>Volume 24h:</strong> ${volMln}M | <strong>Price:</strong> ${cPrice}</p>`;
+
+                html += `<h3>Price Changes</h3>`;
+                html += `<p><strong>1h:</strong> ${h1Change}% | <strong>24h:</strong> ${h24Change}% | <strong>7d:</strong> ${d7Change}% | <strong>30d:</strong> ${d30Change}%</p>`;
+                html += `<p><strong>ATH:</strong> ${athVal} | <strong>ATL:</strong> ${atlVal}</p>`;
+
+                html += `<h3>365-Day Range</h3>`;
+                html += `<p><strong>High:</strong> ${max365} (${max365Date}) ${percMaxToCurrent}% from current</p>`;
+                html += `<p><strong>Low:</strong> ${min365} (${min365Date}) ${percMinToCurrent}% from current</p>`;
+
+                // AI Analytics section
+                html += `<hr><h3>AI Analytics</h3>`;
+                html += formatAnalyticsContent(data.AI_text);
+
+                // AI Investment data
+                html += `<h3>Investment Analysis</h3>`;
+                html += formatAnalyticsContent(data.AI_invest);
+
+                // Additional analysis if available
+                if (data.gemini_invest) {
+                    html += `<h3>Additional Investment Analysis</h3>`;
+                    html += formatAnalyticsContent(data.gemini_invest);
+                }
+
+                // Update modal with content
+                modalContent.innerHTML = html;
+                modalLoading.style.display = 'none';
+                modalContent.style.display = 'block';
+            })
+            .catch(err => {
+                console.error("Error loading coin details:", err);
+                alert("Error: " + err.message);
+                modal.style.display = 'none';
+            });
+    }
+
+    // Format analytics text
+    function formatAnalyticsContent(content) {
+        if (!content) return 'No data available';
+
+        return content
+            .replace(/###\s*(.*?)\n/g, '<h3>$1</h3>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\n/g, '<br>');
+    }
+
+    // Toggle coin filter
+    function toggleCoinFilter() {
+        // Get current state from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const isFiltered = urlParams.get('filtered') === 'true';
+        const category = urlParams.get('category') || '678ded1251eda549b5afd3fe';
+        const sort_by = urlParams.get('sort_by') || 'market_cap_rank';
+        const order = urlParams.get('order') || 'asc';
+
+        // Toggle filter state and redirect
+        if (isFiltered) {
+            // Remove filter
+            window.location.href = `/?category=${category}&sort_by=${sort_by}&order=${order}`;
+        } else {
+            // Apply filter
+            window.location.href = `/?category=${category}&sort_by=${sort_by}&order=${order}&filtered=true`;
+        }
+    }
+
+    // Close modal
+    function closeModal() {
+        document.getElementById('modal').style.display = 'none';
+    }
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set up close button for modal
+        const closeButton = document.getElementById('close-modal');
+        if (closeButton) {
+            closeButton.addEventListener('click', closeModal);
+        }
+
+        // Set up tooltip functionality
+        const tooltipDiv = document.getElementById('category-tooltip');
+        if (tooltipDiv) {
+            document.querySelectorAll('tr[data-categories]').forEach(row => {
+                row.addEventListener('mouseover', function(event) {
+                    const categories = this.getAttribute('data-categories');
+                    if (categories && categories.trim() !== '') {
+                        tooltipDiv.textContent = categories;
+                        tooltipDiv.style.display = 'block';
+                        tooltipDiv.style.left = (event.pageX + 10) + 'px';
+                        tooltipDiv.style.top = (event.pageY + 10) + 'px';
+                    }
+                });
+
+                row.addEventListener('mousemove', function(event) {
+                    tooltipDiv.style.left = (event.pageX + 10) + 'px';
+                    tooltipDiv.style.top = (event.pageY + 10) + 'px';
+                });
+
+                row.addEventListener('mouseout', function() {
+                    tooltipDiv.style.display = 'none';
+                });
+            });
+        }
+    });
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CoinMarketCap Explorer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cmc-style.css') }}">
+    <script src="{{ url_for('static', filename='cmc-main.js') }}"></script>
+</head>
+<body>
+    <!-- Navigation buttons -->
+    <div class="navigation-buttons">
+        <button onclick="window.location.href='/cmc_favourites'">Show favorites</button>
+        <button id="toggle-filter-btn" onclick="toggleCoinFilter()">
+            {% if is_filtered %}Show all coins{% else %}Hide low cap coins{% endif %}
+        </button>
+    </div>
+
+    <!-- Category header -->
+    <h1>{{ current_category_name }} ({{ crypto_data|length }} coins)</h1>
+
+    <!-- Category navigation -->
+    <div class="categories-container">
+        {% for category in top_categories %}
+            <a href="/?category={{ category.id }}{% if is_filtered %}&filtered=true{% endif %}" class="category-button {% if category.id == current_category_id %}active{% endif %}">
+                {{ category.name }}
+            </a>
+        {% endfor %}
+    </div>
+
+    <!-- Main content -->
+    {% if crypto_data %}
+        <div id="table-container">
+            <table id="cryptoTable">
+                <thead>
+                    <tr>
+                        <th><a href="/?category={{ current_category_id }}&sort_by=name&order={% if current_sort == 'name' and current_order == 'asc' %}desc{% else %}asc{% endif %}{% if is_filtered %}&filtered=true{% endif %}">Name (Symbol)
+                            {% if current_sort == 'name' %}<span class="sort-arrow">{% if current_order == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a></th>
+                        <th><a href="/?category={{ current_category_id }}&sort_by=market_cap_rank&order={% if current_sort == 'market_cap_rank' and current_order == 'asc' %}desc{% else %}asc{% endif %}{% if is_filtered %}&filtered=true{% endif %}">Rank
+                            {% if current_sort == 'market_cap_rank' %}<span class="sort-arrow">{% if current_order == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a></th>
+                        <th><a href="/?category={{ current_category_id }}&sort_by=price_change_percentage_24h&order={% if current_sort == 'price_change_percentage_24h' and current_order == 'asc' %}desc{% else %}asc{% endif %}{% if is_filtered %}&filtered=true{% endif %}">24h Change
+                            {% if current_sort == 'price_change_percentage_24h' %}<span class="sort-arrow">{% if current_order == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a></th>
+                        <th><a href="/?category={{ current_category_id }}&sort_by=market_cap&order={% if current_sort == 'market_cap' and current_order == 'asc' %}desc{% else %}asc{% endif %}{% if is_filtered %}&filtered=true{% endif %}">Market Cap
+                            {% if current_sort == 'market_cap' %}<span class="sort-arrow">{% if current_order == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a></th>
+                        <th><a href="/?category={{ current_category_id }}&sort_by=volume_24h&order={% if current_sort == 'volume_24h' and current_order == 'asc' %}desc{% else %}asc{% endif %}{% if is_filtered %}&filtered=true{% endif %}">Volume
+                            {% if current_sort == 'volume_24h' %}<span class="sort-arrow">{% if current_order == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}</a></th>
+                        <th>Price</th>
+                        <th>Category</th>
+                        <th>Min Price</th>
+                        <th>Max Price</th>
+                        <th>Details</th>
+                        <th>Favorite</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for crypto in crypto_data %}
+                        <tr data-coin-id="{{ crypto.coin_id }}" data-categories="{{ crypto.categories_str }}">
+                            <td>{{ crypto.name }} ({{ crypto.symbol }})</td>
+                            <td>{{ crypto.market_cap_rank }}</td>
+                            <td class="{% if crypto.price_change_percentage_24h > 0 %}positive-change{% elif crypto.price_change_percentage_24h < 0 %}negative-change{% endif %}">
+                                {{ crypto.price_change_percentage_24h|safe_round(2) }}%
+                            </td>
+                            <td>{% if crypto.market_cap %}${{ (crypto.market_cap / 1000000)|round(2) }}M{% else %}N/A{% endif %}</td>
+                            <td>{% if crypto.total_volume_usd %}${{ (crypto.total_volume_usd / 1000000)|round(2) }}M{% else %}N/A{% endif %}</td>
+                            <td>${{ crypto.current_price_usd|safe_round(4) }}</td>
+                            <td>{% if crypto.main_category %}{{ crypto.main_category }}{% else %}N/A{% endif %}</td>
+                            <td>{{ crypto.min_365d_price|safe_round(4) if crypto.min_365d_price else 'N/A' }}</td>
+                            <td>{{ crypto.max_365d_price|safe_round(4) if crypto.max_365d_price else 'N/A' }}</td>
+                            <td><button onclick="showCoinDetails('{{ crypto.coin_id }}')">Details</button></td>
+                            <td><button onclick="toggleFavorite('{{ crypto.coin_id }}', {{ 1 if crypto.isFavourites else 0 }})"
+                                    class="{% if crypto.isFavourites %}favorite-active{% endif %} favorite-button">
+                                    {% if crypto.isFavourites %}★{% else %}☆{% endif %}
+                                </button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="no-data">No data to display.</p>
+    {% endif %}
+
+    <!-- Modal window -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <h3 id="modal-title"></h3>
+            <div id="modal-loading">
+                <div class="loader"></div>
+                <p>Loading data. Please wait...</p>
+            </div>
+            <div id="modal-content-data" style="display: none;"></div>
+            <button id="close-modal">Close</button>
+        </div>
+    </div>
+
+    <!-- Tooltip for categories -->
+    <div id="category-tooltip"></div>
+
+    <script>
+    // Include toggleCoinFilter function directly in HTML
+    function toggleCoinFilter() {
+        // Get current state from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const isFiltered = urlParams.get('filtered') === 'true';
+        const category = urlParams.get('category') || '678ded1251eda549b5afd3fe';
+        const sort_by = urlParams.get('sort_by') || 'market_cap_rank';
+        const order = urlParams.get('order') || 'asc';
+
+        // Toggle filter state and redirect
+        if (isFiltered) {
+            // Remove filter
+            window.location.href = `/?category=${category}&sort_by=${sort_by}&order=${order}`;
+        } else {
+            // Apply filter
+            window.location.href = `/?category=${category}&sort_by=${sort_by}&order=${order}&filtered=true`;
+        }
+    }
+    </script>
+</body>
+</html>

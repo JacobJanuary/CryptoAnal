@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Filtered Cryptocurrencies (CoinMarketCap)</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='cmc-main.js') }}"></script>
+</head>
+<body>
+<button id="hide-non-trended-btn">Hide all non-trending</button>
+<button onclick="showAllCoins()">Show all</button>
+<button onclick="window.location.href='/favourites'">Show favorites</button>
+<button onclick="window.location.href='/made_in_usa'">Made in USA</button>
+
+<!-- Button to open filter modal settings -->
+<button id="open-filters-btn">Customize</button>
+
+<h1>Filtered Cryptocurrencies (CoinMarketCap)</h1>
+{% if crypto_data %}
+    <div id="table-container">
+        <table id="cryptoTable" data-sort-direction="asc" data-sort-column="-1">
+            <thead>
+            <tr>
+                <th data-type="string">Name (Symbol)</th>
+                <th data-type="number">Rank</th>
+                <th data-type="string">24h Volume</th>
+                <th data-type="percent">1h Change</th>
+                <th data-type="percent">24h Change</th>
+                <th data-type="number">Current Price</th>
+                <th>CoinMarketCap</th>
+                <th>AI Analytics</th>
+                <th>Favorite</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for crypto in crypto_data %}
+                <tr data-coin-id="{{ crypto.coin_id }}"
+                    data-about-min="{{ crypto.is_top }}"
+                    data-categories="{{ crypto.categories_str }}">
+                    <td>{{ crypto.name }} ({{ crypto.symbol }})</td>
+                    <td>{{ crypto.market_cap_rank }}</td>
+                    <td>{{ crypto.vol_latest|format_volume }}</td>
+                    <td>{{ crypto.percent_change_1h|safe_round(2) }}%</td>
+                    <td>{{ crypto.price_change_24h|safe_round(2) }}%</td>
+                    <td>${{ crypto.current_price|safe_round(4) }}</td>
+                    <td>
+                        <a href="https://coinmarketcap.com/currencies/{{ crypto.name|lower|replace(' ', '-') }}" target="_blank">
+                            Link
+                        </a>
+                    </td>
+                    <td>
+                        <button onclick="showAIAnalytics('{{ crypto.name }}', '{{ crypto.symbol }}')"
+                                class="ai-analytics">
+                            AI Analytics
+                        </button>
+                    </td>
+                    <td>
+                        <button id="favorite-button-{{ crypto.coin_id }}"
+                                onclick="toggleFavorite('{{ crypto.coin_id }}', {{ 1 if crypto.isFavourites else 0 }})">
+                            {% if crypto.isFavourites %}
+                                Remove
+                            {% else %}
+                                Add
+                            {% endif %}
+                        </button>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p>Total cryptocurrencies: {{ crypto_data|length }}</p>
+{% else %}
+    <p>No data to display.</p>
+{% endif %}
+
+<div id="modal" class="modal">
+    <div class="modal-content">
+        <h3 id="modal-title"></h3>
+        <div id="modal-loading">
+            <div class="loader"></div>
+            <p>AI is analyzing information. Please wait...</p>
+        </div>
+        <div id="modal-content-data" style="display: none;"></div>
+        <button id="close-modal">Close</button>
+    </div>
+</div>
+
+<!-- Modal window for filter settings -->
+<div id="filter-modal">
+    <h3>Filter Settings</h3>
+    <label for="vol-min">Minimum 24h Volume:</label>
+    <input type="number" id="vol-min" placeholder="E.g., 10000000">
+
+    <label for="growth24h">Minimum 24h Price Change (%):</label>
+    <input type="number" id="growth24h" step="0.1" placeholder="E.g., 1.0">
+
+    <label for="growth1h">Minimum 1h Price Change (%):</label>
+    <input type="number" id="growth1h" step="0.1" placeholder="E.g., 0.5">
+
+    <label for="price-change-max">Max 24h Price Change (%):</label>
+    <input type="number" id="price-change-max" placeholder="E.g., 10">
+
+    <label for="price-change-min">Min 24h Price Change (%):</label>
+    <input type="number" id="price-change-min" placeholder="E.g., 0">
+
+    <label for="market-cap-rank">Maximum CMC Rank:</label>
+    <input type="number" id="market-cap-rank" placeholder="E.g., 1000">
+
+    <button id="save-filters-btn">Save</button>
+    <button id="close-filters-btn">Close</button>
+</div>
+
+<!-- Tooltip for categories -->
+<div id="category-tooltip"
+     style="display: none; position: absolute; pointer-events: none;
+            background-color: #fff; border: 1px solid #ccc;
+            padding: 5px; z-index: 9999; border-radius: 4px;">
+</div>
+</body>
+</html>
