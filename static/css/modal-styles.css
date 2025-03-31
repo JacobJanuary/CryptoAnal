@@ -1,0 +1,298 @@
+/*
+ * modal-styles.css - Стили для модального окна деталей монеты
+ * Сохраните этот файл в директории static/css/
+ */
+
+#cryptoModal {
+    display: none;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background-color: rgba(0, 0, 0, 0.75) !important;
+    z-index: 99999 !important;
+    overflow-y: auto !important;
+    backdrop-filter: blur(5px);
+}
+
+#cryptoModalContent {
+    background-color: #fff;
+    margin: 30px auto !important;
+    padding: 0 !important;
+    width: 85% !important;
+    max-width: 900px !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2) !important;
+    animation: modalFadeIn 0.3s ease-out;
+    position: relative !important;
+}
+
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+#cryptoModalHeader {
+    position: relative;
+    padding: 20px 25px;
+    background: linear-gradient(135deg, #2c3e50, #4b6cb7);
+    color: white;
+    border-radius: 12px 12px 0 0;
+}
+
+#cryptoModalHeader h3 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.coin-symbol {
+    opacity: 0.8;
+    font-size: 16px;
+    margin-left: 8px;
+}
+
+#cryptoModalClose {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.2s;
+}
+
+#cryptoModalClose:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+}
+
+#cryptoModalBody {
+    padding: 25px;
+    color: #333;
+}
+
+#cryptoModalLoading {
+    display: none;
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: 99998 !important;
+    background-color: rgba(0, 0, 0, 0.7) !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-direction: column !important;
+    color: white !important;
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Стили компонентов модального окна */
+.coin-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.stat-card {
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.stat-label {
+    font-size: 13px;
+    text-transform: uppercase;
+    color: #6c757d;
+    letter-spacing: 0.5px;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.stat-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #2c3e50;
+}
+
+.coin-section {
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    margin-bottom: 25px;
+    overflow: hidden;
+}
+
+.section-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid #eaeaea;
+    display: flex;
+    align-items: center;
+}
+
+.section-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.section-content {
+    padding: 20px;
+}
+
+.positive-change {
+    color: #00c853;
+}
+
+.negative-change {
+    color: #f44336;
+}
+
+.price-range {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    margin-top: 5px;
+}
+
+.range-date {
+    color: #6c757d;
+    font-size: 12px;
+}
+
+.price-slider {
+    height: 6px;
+    width: 100%;
+    background-color: #e9ecef;
+    border-radius: 3px;
+    position: relative;
+    margin: 15px 0;
+}
+
+.price-slider-fill {
+    position: absolute;
+    height: 100%;
+    background: linear-gradient(to right, #4b6cb7, #182848);
+    border-radius: 3px;
+}
+
+.price-slider-handle {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    border: 3px solid #4b6cb7;
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+
+.data-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr); /* 6 колонок */
+    gap: 10px;
+}
+
+.data-item {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+}
+
+.data-label {
+    font-size: 13px;
+    color: #6c757d;
+    margin-bottom: 5px;
+}
+
+.data-value {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.analytics-content {
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+.analytics-content h4 {
+    font-size: 17px;
+    color: #2c3e50;
+    margin-top: 20px;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.analytics-content p {
+    margin: 0 0 15px;
+    color: #333;
+}
+
+.analytics-content strong {
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+/* Адаптивные стили */
+@media (max-width: 768px) {
+    #cryptoModalContent {
+        width: 95% !important;
+        margin: 15px auto !important;
+    }
+
+    .coin-stats-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    #cryptoModalContent {
+        width: 98% !important;
+        margin: 10px auto !important;
+    }
+
+    #cryptoModalHeader h3 {
+        font-size: 20px;
+    }
+
+    .coin-stats-grid {
+        grid-template-columns: 1fr;
+    }
+}

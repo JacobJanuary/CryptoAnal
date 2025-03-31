@@ -2,9 +2,30 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Favorite Coins</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/cmc-style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modal-styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/table-styles.css') }}">
+    <style>
+        /* Для полной прокрутки таблицы на мобильных устройствах */
+        #table-container {
+            overflow-x: auto;
+        }
+
+        /* Делаем таблицу более компактной */
+        td, th {
+            padding: 8px 4px;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        /* Упрощаем сортировку по каждой колонке */
+        th a {
+            padding: 4px 2px;
+        }
+    </style>
 </head>
 <body>
     <!-- Navigation buttons -->
@@ -20,7 +41,7 @@
             <thead>
                 <tr>
                     <th>
-                        <a href="{{ url_for('favourites', sort_by='name', order=opposite_order if current_sort == 'name' else 'asc') }}">
+                        <a href="{{ url_for('favourites', sort_by='name', order=opposite_order if current_sort == 'name' else 'asc') }}" class="{% if current_sort == 'name' %}active{% endif %}">
                             Name (Symbol)
                             {% if current_sort == 'name' %}
                                 <span class="sort-arrow">
@@ -30,7 +51,7 @@
                         </a>
                     </th>
                     <th>
-                        <a href="{{ url_for('favourites', sort_by='market_cap_rank', order=opposite_order if current_sort == 'market_cap_rank' else 'asc') }}">
+                        <a href="{{ url_for('favourites', sort_by='market_cap_rank', order=opposite_order if current_sort == 'market_cap_rank' else 'asc') }}" class="{% if current_sort == 'market_cap_rank' %}active{% endif %}">
                             Rank
                             {% if current_sort == 'market_cap_rank' %}
                                 <span class="sort-arrow">
@@ -40,9 +61,79 @@
                         </a>
                     </th>
                     <th>
-                        <a href="{{ url_for('favourites', sort_by='price_change_percentage_24h', order=opposite_order if current_sort == 'price_change_percentage_24h' else 'asc') }}">
-                            24h Change
+                        <a href="{{ url_for('favourites', sort_by='big_volume_rank', order=opposite_order if current_sort == 'big_volume_rank' else 'asc') }}" class="{% if current_sort == 'big_volume_rank' %}active{% endif %}">
+                            BigVolumeRank
+                            {% if current_sort == 'big_volume_rank' %}
+                                <span class="sort-arrow">
+                                    {% if current_order == 'asc' %}▲{% else %}▼{% endif %}
+                                </span>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="{{ url_for('favourites', sort_by='percent_change_1h', order=opposite_order if current_sort == 'percent_change_1h' else 'asc') }}" class="{% if current_sort == 'percent_change_1h' %}active{% endif %}">
+                            1h
+                            {% if current_sort == 'percent_change_1h' %}
+                                <span class="sort-arrow">
+                                    {% if current_order == 'asc' %}▲{% else %}▼{% endif %}
+                                </span>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="{{ url_for('favourites', sort_by='price_change_percentage_24h', order=opposite_order if current_sort == 'price_change_percentage_24h' else 'asc') }}" class="{% if current_sort == 'price_change_percentage_24h' %}active{% endif %}">
+                            24h
                             {% if current_sort == 'price_change_percentage_24h' %}
+                                <span class="sort-arrow">
+                                    {% if current_order == 'asc' %}▲{% else %}▼{% endif %}
+                                </span>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="{{ url_for('favourites', sort_by='percent_change_7d', order=opposite_order if current_sort == 'percent_change_7d' else 'asc') }}" class="{% if current_sort == 'percent_change_7d' %}active{% endif %}">
+                            7d
+                            {% if current_sort == 'percent_change_7d' %}
+                                <span class="sort-arrow">
+                                    {% if current_order == 'asc' %}▲{% else %}▼{% endif %}
+                                </span>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="{{ url_for('favourites', sort_by='percent_change_30d', order=opposite_order if current_sort == 'percent_change_30d' else 'asc') }}" class="{% if current_sort == 'percent_change_30d' %}active{% endif %}">
+                            30d
+                            {% if current_sort == 'percent_change_30d' %}
+                                <span class="sort-arrow">
+                                    {% if current_order == 'asc' %}▲{% else %}▼{% endif %}
+                                </span>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="{{ url_for('favourites', sort_by='percent_change_60d', order=opposite_order if current_sort == 'percent_change_60d' else 'asc') }}" class="{% if current_sort == 'percent_change_60d' %}active{% endif %}">
+                            60d
+                            {% if current_sort == 'percent_change_60d' %}
+                                <span class="sort-arrow">
+                                    {% if current_order == 'asc' %}▲{% else %}▼{% endif %}
+                                </span>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="{{ url_for('favourites', sort_by='percent_change_90d', order=opposite_order if current_sort == 'percent_change_90d' else 'asc') }}" class="{% if current_sort == 'percent_change_90d' %}active{% endif %}">
+                            90d
+                            {% if current_sort == 'percent_change_90d' %}
+                                <span class="sort-arrow">
+                                    {% if current_order == 'asc' %}▲{% else %}▼{% endif %}
+                                </span>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="{{ url_for('favourites', sort_by='volume_24h', order=opposite_order if current_sort == 'volume_24h' else 'asc') }}" class="{% if current_sort == 'volume_24h' %}active{% endif %}">
+                            24h Volume
+                            {% if current_sort == 'volume_24h' %}
                                 <span class="sort-arrow">
                                     {% if current_order == 'asc' %}▲{% else %}▼{% endif %}
                                 </span>
@@ -57,11 +148,45 @@
             </thead>
             <tbody>
             {% for coin in coins %}
-                <tr>
+                {% set big_volume_percent = (coin.high_volume_days / coin.total_days * 100)|round(1) if coin.high_volume_days and coin.total_days else 0 %}
+                {% set row_class = 'volume-low' %}
+                {% if big_volume_percent >= 13 and big_volume_percent <= 15 %}
+                    {% set row_class = 'volume-medium' %}
+                {% elif big_volume_percent > 15 and big_volume_percent <= 17 %}
+                    {% set row_class = 'volume-high' %}
+                {% elif big_volume_percent > 17 and big_volume_percent <= 20 %}
+                    {% set row_class = 'volume-very-high' %}
+                {% elif big_volume_percent > 20 %}
+                    {% set row_class = 'volume-excellent' %}
+                {% endif %}
+                <tr class="{{ row_class }}">
                     <td>{{ coin.name }} ({{ coin.symbol }})</td>
                     <td>{{ coin.market_cap_rank }}</td>
+                    <td>{{ big_volume_percent }}%</td>
+                    <td class="{% if coin.percent_change_1h > 0 %}positive-change{% elif coin.percent_change_1h < 0 %}negative-change{% endif %}">
+                        {{ coin.percent_change_1h|safe_round(2) }}%
+                    </td>
                     <td class="{% if coin.price_change_percentage_24h > 0 %}positive-change{% elif coin.price_change_percentage_24h < 0 %}negative-change{% endif %}">
                         {{ coin.price_change_percentage_24h|safe_round(2) }}%
+                    </td>
+                    <td class="{% if coin.percent_change_7d > 0 %}positive-change{% elif coin.percent_change_7d < 0 %}negative-change{% endif %}">
+                        {{ coin.percent_change_7d|safe_round(2) }}%
+                    </td>
+                    <td class="{% if coin.percent_change_30d > 0 %}positive-change{% elif coin.percent_change_30d < 0 %}negative-change{% endif %}">
+                        {{ coin.percent_change_30d|safe_round(2) }}%
+                    </td>
+                    <td class="{% if coin.percent_change_60d > 0 %}positive-change{% elif coin.percent_change_60d < 0 %}negative-change{% endif %}">
+                        {{ coin.percent_change_60d|safe_round(2) }}%
+                    </td>
+                    <td class="{% if coin.percent_change_90d > 0 %}positive-change{% elif coin.percent_change_90d < 0 %}negative-change{% endif %}">
+                        {{ coin.percent_change_90d|safe_round(2) }}%
+                    </td>
+                    <td>
+                        {% if coin.total_volume_usd %}
+                            ${{ (coin.total_volume_usd / 1000000)|round(2) }}M
+                        {% else %}
+                            N/A
+                        {% endif %}
                     </td>
                     <td>${{ coin.current_price_usd|safe_round(4) }}</td>
                     <td>
@@ -87,19 +212,21 @@
     <p class="no-data">No favorite coins yet</p>
     {% endif %}
 
-    <!-- Modal window -->
-    <div id="modal" class="modal">
-        <div class="modal-content">
-            <h3 id="modal-title"></h3>
-            <div id="modal-loading">
-                <div class="loader"></div>
-                <p>Loading data. Please wait...</p>
-            </div>
-            <div id="modal-content-data" style="display:none;"></div>
-            <button id="close-modal">Close</button>
+    <!-- Модальное окно для деталей криптовалюты -->
+    <div id="cryptoModal">
+        <div id="cryptoModalContent">
+            <!-- Содержимое будет вставлено динамически через JavaScript -->
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='cmc-main.js') }}"></script>
+    <!-- Индикатор загрузки для модального окна -->
+    <div id="cryptoModalLoading">
+        <div class="loading-spinner"></div>
+        <p>Loading coin data...</p>
+    </div>
+
+    <!-- Подключение JavaScript -->
+    <script src="{{ url_for('static', filename='cmc_main.js') }}"></script>
+    <script src="{{ url_for('static', filename='crypto-modal.js') }}"></script>
 </body>
 </html>

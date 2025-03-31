@@ -1,0 +1,194 @@
+/* Улучшенные стили с высоким контрастом для заголовков таблицы */
+
+/* Основные стили для всей таблицы */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    border: 1px solid #d0d0d0;
+}
+
+/* Стили для ячеек таблицы */
+td, th {
+    padding: 10px 8px;
+    text-align: left;
+    border: 1px solid #d0d0d0;
+}
+
+/* ВЫСОКО-КОНТРАСТНЫЕ СТИЛИ ДЛЯ ЗАГОЛОВКОВ */
+thead {
+    border-bottom: 2px solid #2c3e50;
+}
+
+th {
+    background: linear-gradient(to bottom, #4b6cb7 0%, #182848 100%);
+    color: white;
+    font-weight: 700;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 2px 3px rgba(0,0,0,0.2);
+    padding: 12px 8px;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.3);
+    border: 1px solid #2c3e50;
+}
+
+/* Стили для ссылок в заголовках */
+th a {
+    color: white !important;
+    text-decoration: none;
+    display: block;
+    width: 100%;
+    padding: 0;
+    position: relative;
+    font-weight: 700;
+}
+
+/* Псевдо-элемент для эффекта наведения */
+th a:before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0);
+    transition: background-color 0.2s;
+}
+
+/* Эффект наведения */
+th a:hover:before {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Активный заголовок (сортировка) */
+th a.active {
+    position: relative;
+    font-weight: 800;
+    color: white !important;
+}
+
+/* Подсветка активной колонки */
+th a.active:before {
+    content: "";
+    position: absolute;
+    top: -12px;
+    left: -8px;
+    width: calc(100% + 16px);
+    height: calc(100% + 24px);
+    background-color: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+    z-index: -1;
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.3);
+}
+
+/* Стрелка сортировки */
+.sort-arrow {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 16px;
+    font-weight: bold;
+    position: relative;
+    top: 1px;
+    color: #ffeb3b; /* Желтый цвет для лучшего контраста */
+}
+
+/* Видоизменение заголовка BigVolumeRank для особого выделения */
+th:nth-child(3) {
+    background: linear-gradient(to bottom, #2e7d32 0%, #1b5e20 100%);
+    border: 1px solid #1b5e20;
+}
+
+th:nth-child(3) a.active:before {
+    background-color: rgba(255, 255, 255, 0.2);
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.4);
+}
+
+/* Отдельные стили для каждого заголовка для лучшего распознавания */
+th:nth-child(1) { /* Name */
+    background: linear-gradient(to bottom, #4b6cb7 0%, #182848 100%);
+}
+th:nth-child(2) { /* Rank */
+    background: linear-gradient(to bottom, #512da8 0%, #311b92 100%);
+}
+th:nth-child(3) { /* BigVolumeRank - уже определен выше */
+}
+th:nth-child(4) { /* 24h Change */
+    background: linear-gradient(to bottom, #c2185b 0%, #880e4f 100%);
+}
+th:nth-child(5) { /* Market Cap */
+    background: linear-gradient(to bottom, #00695c 0%, #004d40 100%);
+}
+th:nth-child(6) { /* Volume */
+    background: linear-gradient(to bottom, #0277bd 0%, #01579b 100%);
+}
+th:nth-child(7) { /* Price */
+    background: linear-gradient(to bottom, #f57c00 0%, #e65100 100%);
+}
+th:nth-child(8) { /* Category */
+    background: linear-gradient(to bottom, #689f38 0%, #33691e 100%);
+}
+th:nth-child(9), th:nth-child(10) { /* Min Price, Max Price */
+    background: linear-gradient(to bottom, #00acc1 0%, #006064 100%);
+}
+th:nth-child(11), th:nth-child(12) { /* Details, Favorite */
+    background: linear-gradient(to bottom, #5d4037 0%, #3e2723 100%);
+}
+
+/* Стили для BigVolumeRank и цветовой индикации строк */
+.volume-low {
+    background-color: rgba(255, 255, 255, 0.5);
+}
+
+.volume-medium {
+    background-color: rgba(173, 216, 230, 0.4);
+}
+
+.volume-high {
+    background-color: rgba(144, 238, 144, 0.4);
+}
+
+.volume-very-high {
+    background-color: rgba(152, 251, 152, 0.5);
+}
+
+.volume-excellent {
+    background-color: rgba(50, 205, 50, 0.4);
+}
+
+/* Стили для положительных и отрицательных изменений */
+.positive-change {
+    color: #00c853;
+    font-weight: 600;
+}
+
+.negative-change {
+    color: #f44336;
+    font-weight: 600;
+}
+
+/* Зебра для улучшения читаемости строк */
+tr:nth-child(even) {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Адаптивные стили */
+@media (max-width: 1200px) {
+    table {
+        font-size: 14px;
+    }
+
+    td, th {
+        padding: 8px 6px;
+    }
+}
+
+@media (max-width: 768px) {
+    #table-container {
+        overflow-x: auto;
+    }
+    
+    table {
+        min-width: 900px;
+    }
+}

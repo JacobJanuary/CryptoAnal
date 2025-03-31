@@ -133,7 +133,8 @@ def index():
             'market_cap_rank': 'c.cmc_rank',
             'price_change_percentage_24h': 'c.percent_change_24h',
             'market_cap': 'c.market_cap',
-            'volume_24h': 'c.volume_24h'
+            'volume_24h': 'c.volume_24h',
+            'big_volume_rank': '(c.high_volume_days / c.total_days * 100)'  # Добавляем новый параметр сортировки
         }
 
         if sort_by not in valid_sort_fields:
@@ -206,6 +207,8 @@ def index():
                 c.price_usd as current_price_usd,
                 c.min_365d_price,
                 c.max_365d_price,
+                c.high_volume_days,
+                c.total_days,
                 (SELECT COUNT(*) > 0 FROM cmc_favorites WHERE coin_id = c.id) as isFavourites,
                 (
                     SELECT cat.name
@@ -327,8 +330,15 @@ def toggle_favourite():
 
         # Now handle the favorite action
         if new_val:
-            print(f"Adding coin {coin_id} to favorites")  # Debug output
-            cur.execute("INSERT IGNORE INTO cmc_favorites (coin_id) VALUES (%s)", (coin_id,))
+            # Check if record already exists before inserting
+            cur.execute("SELECT id FROM cmc_favorites WHERE coin_id = %s", (coin_id,))
+            exists = cur.fetchone() is not None
+
+            if not exists:
+                print(f"Adding coin {coin_id} to favorites")  # Debug output
+                cur.execute("INSERT INTO cmc_favorites (coin_id) VALUES (%s)", (coin_id,))
+            else:
+                print(f"Coin {coin_id} already in favorites - nothing to do")  # Debug output
         else:
             print(f"Removing coin {coin_id} from favorites")  # Debug output
             cur.execute("DELETE FROM cmc_favorites WHERE coin_id = %s", (coin_id,))
@@ -358,7 +368,13 @@ def favourites():
             'market_cap_rank': 'c.cmc_rank',
             'price_change_percentage_24h': 'c.percent_change_24h',
             'market_cap': 'c.market_cap',
-            'volume_24h': 'c.volume_24h'
+            'volume_24h': 'c.volume_24h',
+            'big_volume_rank': '(c.high_volume_days / c.total_days * 100)',
+            'percent_change_1h': 'c.percent_change_1h',
+            'percent_change_7d': 'c.percent_change_7d',
+            'percent_change_30d': 'c.percent_change_30d',
+            'percent_change_60d': 'c.percent_change_60d',
+            'percent_change_90d': 'c.percent_change_90d'
         }
 
         if sort_by not in valid_sort_fields:
@@ -379,8 +395,15 @@ def favourites():
                    c.cmc_rank AS market_cap_rank,
                    c.price_usd AS current_price_usd,
                    c.percent_change_24h AS price_change_percentage_24h,
+                   c.percent_change_1h,
+                   c.percent_change_7d,
+                   c.percent_change_30d,
+                   c.percent_change_60d,
+                   c.percent_change_90d,
                    c.market_cap,
                    c.volume_24h AS total_volume_usd,
+                   c.high_volume_days,
+                   c.total_days,
                    (
                      SELECT cat.name
                      FROM cmc_category_relations ccr
@@ -438,7 +461,10 @@ def coin_details(coin_id):
                 c.percent_change_7d,
                 c.percent_change_30d,
                 c.percent_change_60d,
-                c.percent_change_90d
+                c.percent_change_90d,
+                c.date_added,
+                c.circulating_supply,
+                c.total_supply
             FROM cmc_crypto c
             WHERE c.id = %s
         """
