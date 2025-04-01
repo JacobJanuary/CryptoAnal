@@ -8,29 +8,14 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/cmc-style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modal-styles.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/table-styles.css') }}">
-    <style>
-        /* Для полной прокрутки таблицы на мобильных устройствах */
-        #table-container {
-            overflow-x: auto;
-        }
-
-        /* Делаем таблицу более компактной */
-        td, th {
-            padding: 8px 4px;
-            font-size: 14px;
-            white-space: nowrap;
-        }
-
-        /* Упрощаем сортировку по каждой колонке */
-        th a {
-            padding: 4px 2px;
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/purchase-styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/add-tokens-styles.css') }}">
 </head>
 <body>
     <!-- Navigation buttons -->
     <div class="navigation-buttons">
         <button onclick="window.location.href='/'">Back to Main List</button>
+        <button class="add-tokens-btn" onclick="openAddTokensModal()">Добавить токены в избранное</button>
     </div>
 
     <h1>Favorite Coins</h1>
@@ -142,6 +127,7 @@
                     </th>
                     <th>Price</th>
                     <th>Category</th>
+                    <th>Покупка</th>
                     <th>Details</th>
                     <th>Remove</th>
                 </tr>
@@ -159,7 +145,7 @@
                 {% elif big_volume_percent > 20 %}
                     {% set row_class = 'volume-excellent' %}
                 {% endif %}
-                <tr class="{{ row_class }}">
+                <tr class="{{ row_class }}" data-categories="{{ coin.categories_str }}">
                     <td>{{ coin.name }} ({{ coin.symbol }})</td>
                     <td>{{ coin.market_cap_rank }}</td>
                     <td>{{ big_volume_percent }}%</td>
@@ -196,6 +182,11 @@
                            N/A
                         {% endif %}
                     </td>
+                    <td class="purchase-buttons" data-coin-id="{{ coin.id }}">
+                        <button class="purchase-button" data-amount="500" onclick="togglePurchaseButton(this)">$500</button>
+                        <button class="purchase-button" data-amount="1000" onclick="togglePurchaseButton(this)">$1000</button>
+                        <button class="purchase-button" data-amount="2000" onclick="togglePurchaseButton(this)">$2000</button>
+                    </td>
                     <td>
                         <button onclick="showCoinDetails('{{ coin.id }}')">Details</button>
                     </td>
@@ -208,9 +199,17 @@
         </table>
     </div>
     <p class="total-count">Total: {{ coins|length }} coins</p>
+
+    <!-- Кнопка для оформления покупки -->
+    <div class="purchase-container">
+        <button id="complete-purchase-btn" onclick="completePurchase()">Оформить покупку</button>
+    </div>
     {% else %}
     <p class="no-data">No favorite coins yet</p>
     {% endif %}
+
+    <!-- Tooltip для категорий -->
+    <div id="category-tooltip"></div>
 
     <!-- Модальное окно для деталей криптовалюты -->
     <div id="cryptoModal">
@@ -225,8 +224,136 @@
         <p>Loading coin data...</p>
     </div>
 
+    <!-- Модальное окно покупки криптовалюты -->
+    <div id="purchaseModal" class="purchase-modal">
+        <div class="purchase-modal-content">
+            <div class="purchase-modal-header">
+                <h2>Покупка криптовалюты</h2>
+                <button class="purchase-modal-close" onclick="closePurchaseModal()">&times;</button>
+            </div>
+            <div class="purchase-modal-body">
+                <!-- Выбор инвестиционного портфеля -->
+                <div class="portfolio-selection">
+                    <h3>Выберите инвестиционный портфель</h3>
+                    <div class="portfolio-options" id="portfolioOptions">
+                        <!-- Список портфелей будет загружен динамически -->
+                    </div>
+                    <div class="portfolio-actions">
+                        <button class="add-portfolio-btn" onclick="showAddPortfolioForm()">+ Добавить новый портфель</button>
+                    </div>
+
+                    <!-- Форма добавления нового портфеля -->
+                    <div id="addPortfolioForm" class="add-portfolio-form">
+                        <div class="form-group">
+                            <label for="portfolioName">Название портфеля*:</label>
+                            <input type="text" id="portfolioName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="portfolioDescription">Описание:</label>
+                            <textarea id="portfolioDescription" rows="3"></textarea>
+                        </div>
+                        <div class="form-buttons">
+                            <button class="cancel-btn" onclick="hideAddPortfolioForm()">Отмена</button>
+                            <button class="submit-btn" onclick="addNewPortfolio()">Добавить</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Таблица выбранных монет -->
+                <h3>Выбранные монеты</h3>
+                <table class="purchase-table" id="purchaseTable">
+                    <thead>
+                        <tr>
+                            <th>Название</th>
+                            <th>Количество токенов</th>
+                            <th>Цена за токен ($)</th>
+                            <th>Дата/время</th>
+                            <th>Сумма ($)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="purchaseTableBody">
+                        <!-- Данные будут добавлены динамически -->
+                    </tbody>
+                </table>
+
+                <!-- Итоговая сумма -->
+                <div class="purchase-total" id="purchaseTotal">
+                    Итого: $0.00
+                </div>
+            </div>
+            <div class="purchase-modal-footer">
+                <button class="purchase-save-btn" onclick="savePurchases()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно добавления токенов в избранное -->
+    <div id="addTokensModal" class="add-tokens-modal">
+        <div class="add-tokens-modal-content">
+            <div class="add-tokens-modal-header">
+                <h2>Добавление токенов в избранное</h2>
+                <button class="add-tokens-modal-close" onclick="closeAddTokensModal()">&times;</button>
+            </div>
+            <div class="add-tokens-modal-body">
+                <!-- Поиск токенов -->
+                <div class="token-search-container">
+                    <input type="text" id="tokenSearchInput" class="token-search-input" placeholder="Введите название или символ токена для поиска..." autocomplete="off">
+
+                    <!-- Результаты поиска -->
+                    <div id="tokenSearchResults" class="token-search-results">
+                        <!-- Результаты будут добавлены динамически через JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Таблица выбранных токенов -->
+                <h3>Выбранные токены</h3>
+                <table class="selected-tokens-table">
+                    <thead>
+                        <tr>
+                            <th>Название (Символ)</th>
+                            <th>Ранг</th>
+                            <th>Цена</th>
+                            <th>Объем 24ч</th>
+                            <th>Действие</th>
+                        </tr>
+                    </thead>
+                    <tbody id="selectedTokensBody">
+                        <!-- Токены будут добавлены динамически через JavaScript -->
+                    </tbody>
+                </table>
+                <div id="noSelectedTokensMessage" class="empty-list-message">
+                    Нет выбранных токенов. Используйте поиск выше, чтобы добавить токены.
+                </div>
+            </div>
+            <div class="add-tokens-modal-footer">
+                <button id="addToFavouritesBtn" class="add-to-favourites-btn" onclick="addTokensToFavourites()" disabled>Добавить выбранные токены в избранное</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Спиннер загрузки -->
+    <div id="spinnerOverlay" class="spinner-overlay">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Уведомление -->
+    <div id="notification" class="notification"></div>
+
     <!-- Подключение JavaScript -->
     <script src="{{ url_for('static', filename='cmc_main.js') }}"></script>
     <script src="{{ url_for('static', filename='crypto-modal.js') }}"></script>
+    <script src="{{ url_for('static', filename='purchase.js') }}"></script>
+    <script src="{{ url_for('static', filename='add-tokens.js') }}"></script>
+
+    <script>
+        // При загрузке страницы вызываем setupCategoryTooltips из cmc_main.js
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof setupCategoryTooltips === 'function') {
+                setupCategoryTooltips();
+            } else {
+                console.error("Функция setupCategoryTooltips не найдена. Убедитесь, что файл cmc_main.js загружен правильно.");
+            }
+        });
+    </script>
 </body>
 </html>

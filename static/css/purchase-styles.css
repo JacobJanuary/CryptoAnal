@@ -1,0 +1,405 @@
+/* Стили для кнопок покупки */
+.purchase-button {
+    margin: 0 2px;
+    padding: 4px 6px;
+    border: 1px solid #ccc;
+    background-color: #f8f8f8;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s ease;
+}
+
+.purchase-button.active {
+    background-color: #4CAF50;
+    color: white;
+    border-color: #2E7D32;
+}
+
+.purchase-button:hover {
+    background-color: #e9e9e9;
+}
+
+.purchase-button.active:hover {
+    background-color: #3e8e41;
+}
+
+/* Кнопка оформления покупки */
+#complete-purchase-btn {
+    display: none;
+    margin: 20px auto;
+    padding: 10px 20px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    transition: all 0.2s ease;
+}
+
+#complete-purchase-btn:hover {
+    background-color: #45a049;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 5px rgba(0,0,0,0.3);
+}
+
+#complete-purchase-btn:active {
+    transform: translateY(1px);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.purchase-container {
+    text-align: center;
+    margin-top: 20px;
+}
+
+/* Модальное окно покупки */
+.purchase-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 1000;
+    overflow-y: auto;
+}
+
+.purchase-modal-content {
+    background-color: #fefefe;
+    margin: 40px auto;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    width: 80%;
+    max-width: 900px;
+    position: relative;
+    animation: modalFadeIn 0.3s;
+}
+
+@keyframes modalFadeIn {
+    from {opacity: 0; transform: translateY(-20px);}
+    to {opacity: 1; transform: translateY(0);}
+}
+
+.purchase-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.purchase-modal-header h2 {
+    margin: 0;
+    color: #333;
+    font-size: 1.5rem;
+}
+
+.purchase-modal-close {
+    font-size: 24px;
+    font-weight: bold;
+    color: #777;
+    cursor: pointer;
+    transition: color 0.2s;
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+.purchase-modal-close:hover {
+    color: #333;
+}
+
+.purchase-modal-body {
+    margin-bottom: 20px;
+}
+
+.purchase-modal-footer {
+    border-top: 1px solid #ddd;
+    padding-top: 15px;
+    text-align: right;
+}
+
+/* Выбор портфеля */
+.portfolio-selection {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    border: 1px solid #eee;
+}
+
+.portfolio-selection h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #333;
+    font-size: 1.2rem;
+}
+
+.portfolio-options {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.portfolio-radio {
+    display: none;
+}
+
+.portfolio-label {
+    display: inline-block;
+    padding: 8px 15px;
+    background-color: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.portfolio-radio:checked + .portfolio-label {
+    background-color: #4CAF50;
+    color: white;
+    border-color: #2E7D32;
+}
+
+.portfolio-label:hover {
+    background-color: #e9e9e9;
+}
+
+.portfolio-radio:checked + .portfolio-label:hover {
+    background-color: #3e8e41;
+}
+
+.add-portfolio-btn {
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.add-portfolio-btn:hover {
+    background-color: #0b7dda;
+}
+
+/* Таблица покупок */
+.purchase-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+.purchase-table th,
+.purchase-table td {
+    padding: 12px 8px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.purchase-table th {
+    background-color: #333;
+    color: #fff;
+    font-weight: 600;
+}
+
+.purchase-table tr:hover {
+    background-color: #f9f9f9;
+}
+
+.purchase-table input[type="number"],
+.purchase-table input[type="datetime-local"] {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.purchase-table input:focus {
+    border-color: #4CAF50;
+    outline: none;
+    box-shadow: 0 0 3px rgba(76, 175, 80, 0.3);
+}
+
+.purchase-total {
+    font-size: 1.2rem;
+    font-weight: bold;
+    text-align: right;
+    margin: 15px 0;
+}
+
+.purchase-save-btn {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    font-size: 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.purchase-save-btn:hover {
+    background-color: #45a049;
+}
+
+/* Форма добавления портфеля */
+.add-portfolio-form {
+    display: none;
+    margin-top: 15px;
+    padding: 15px;
+    background-color: #f0f0f0;
+    border-radius: 8px;
+}
+
+.add-portfolio-form .form-group {
+    margin-bottom: 15px;
+}
+
+.add-portfolio-form label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.add-portfolio-form input[type="text"],
+.add-portfolio-form textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.add-portfolio-form input:focus,
+.add-portfolio-form textarea:focus {
+    border-color: #4CAF50;
+    outline: none;
+    box-shadow: 0 0 3px rgba(76, 175, 80, 0.3);
+}
+
+.add-portfolio-form .form-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.add-portfolio-form button {
+    padding: 8px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.add-portfolio-form .cancel-btn {
+    background-color: #f44336;
+    color: white;
+}
+
+.add-portfolio-form .submit-btn {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.add-portfolio-form .cancel-btn:hover {
+    background-color: #d32f2f;
+}
+
+.add-portfolio-form .submit-btn:hover {
+    background-color: #45a049;
+}
+
+/* Спиннер загрузки */
+.spinner-overlay {
+    display: none;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0,0,0,0.5);
+    z-index: 2000;
+    cursor: wait;
+}
+
+.spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    margin-top: -30px;
+    margin-left: -30px;
+    border: 6px solid #f3f3f3;
+    border-top: 6px solid #4CAF50;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Стили для уведомлений */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 20px;
+    border-radius: 5px;
+    background-color: #4CAF50;
+    color: white;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    z-index: 3000;
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: opacity 0.3s, transform 0.3s;
+}
+
+.notification.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.notification.error {
+    background-color: #f44336;
+}
+
+.notification.warning {
+    background-color: #ff9800;
+}
+
+/* Адаптивность для мобильных устройств */
+@media screen and (max-width: 768px) {
+    .purchase-modal-content {
+        width: 95%;
+        margin: 20px auto;
+        padding: 15px;
+    }
+
+    .purchase-table th,
+    .purchase-table td {
+        padding: 8px 5px;
+        font-size: 14px;
+    }
+
+    .portfolio-options {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .portfolio-label {
+        margin-bottom: 5px;
+    }
+}

@@ -7,11 +7,20 @@ from flask_caching import Cache
 from flask_mysqldb import MySQL
 import mysql.connector as mc
 
+# Импорты для работы с CMC API и управления портфелями
+import json
+import time
+import requests
+from datetime import datetime
+
+
 app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'simple'})
 
 load_dotenv()
 XAI_API_KEY = os.getenv("XAI_API_KEY")
+# Получение ключа API для CoinMarketCap
+CMC_API_KEY = os.getenv("CMC_API_KEY", "")
 
 # MySQL configuration for Flask-MySQLdb
 app.config['MYSQL_HOST'] = os.getenv("MYSQL_HOST", "localhost")
@@ -354,6 +363,10 @@ def toggle_favourite():
         return jsonify({"error": str(e)}), 500
 
 
+# В файле app.py функция favourites нужно модифицировать запрос,
+# чтобы он также получал категории для каждой монеты.
+# Найдите функцию favourites и обновите запрос:
+
 @app.route("/cmc_favourites")
 def favourites():
     """
@@ -417,13 +430,40 @@ def favourites():
             {order_by_clause}
         """
         cursor.execute(query)
-        rows = cursor.fetchall()
+        coins = cursor.fetchall()
+
+        # Получаем категории для каждой монеты
+        if coins:
+            coin_ids = [coin['id'] for coin in coins]
+            if coin_ids:
+                format_str = ','.join(['%s'] * len(coin_ids))
+                cursor.execute(f"""
+                    SELECT ccr.coin_id, c.name
+                    FROM cmc_category_relations ccr
+                    JOIN categories c ON ccr.category_id = c.id
+                    WHERE ccr.coin_id IN ({format_str})
+                    ORDER BY c.isTop DESC
+                """, tuple(coin_ids))
+                rows = cursor.fetchall()
+
+                from collections import defaultdict
+                cat_map = defaultdict(list)
+                for r in rows:
+                    c_id = r['coin_id']
+                    cat_name = r['name']
+                    cat_map[c_id].append(cat_name)
+
+                for coin in coins:
+                    c_id = coin['id']
+                    categories_list = cat_map.get(c_id, [])
+                    coin['categories_str'] = ", ".join(categories_list)
+
         cursor.close()
         conn.close()
 
         opposite_order = 'desc' if order == 'asc' else 'asc'
 
-        return render_template("cmc_favourites.html", coins=rows, current_sort=sort_by, current_order=order,
+        return render_template("cmc_favourites.html", coins=coins, current_sort=sort_by, current_order=order,
                                opposite_order=opposite_order)
 
     except Exception as e:
@@ -492,6 +532,288 @@ def coin_details(coin_id):
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+
+@app.route("/update_prices", methods=["POST"])
+def update_prices():
+    try:
+        # Получаем идентификаторы монет из избранного
+        conn = mc.connect(**db_config)
+        cursor = conn.cursor(dictionary=True)
+
+        # Запрос для получения id и символов всех избранных монет
+        query = """
+            SELECT c.id, c.symbol
+            FROM cmc_crypto c
+            JOIN cmc_favorites f ON c.id = f.coin_id
+        """
+        cursor.execute(query)
+        favorites = cursor.fetchall()
+
+        if not favorites:
+            return jsonify({"error": "Нет избранных монет"}), 400
+
+        # Подготовка параметров для запроса к CoinMarketCap API
+        symbols = ','.join([coin['symbol'] for coin in favorites])
+
+        if not CMC_API_KEY:
+            return jsonify({"error": "API ключ CoinMarketCap не настроен"}), 400
+
+        # Запрос к API CoinMarketCap
+        url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest'
+        parameters = {
+            'symbol': symbols,
+            'convert': 'USD'
+        }
+        headers = {
+            'Accepts': 'application/json',
+            'X-CMC_PRO_API_KEY': CMC_API_KEY,
+        }
+
+        response = requests.get(url, headers=headers, params=parameters)
+        data = response.json()
+
+        if 'status' not in data or data['status']['error_code'] != 0:
+            error_msg = data.get('status', {}).get('error_message', 'Unknown error')
+            return jsonify({"error": f"Ошибка API CoinMarketCap: {error_msg}"}), 400
+
+        # Обновление цен в базе данных
+        update_count = 0
+        for coin in favorites:
+            symbol = coin['symbol']
+            if symbol in data['data']:
+                coin_data = data['data'][symbol]
+                price = coin_data['quote']['USD']['price']
+
+                # Обновляем цену в базе данных
+                update_query = """
+                    UPDATE cmc_crypto
+                    SET price_usd = %s, 
+                        last_updated = NOW()
+                    WHERE id = %s
+                """
+                cursor.execute(update_query, (price, coin['id']))
+                update_count += 1
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "success": True,
+            "message": f"Обновлены цены для {update_count} монет",
+            "updated_coins": update_count
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/get_portfolios", methods=["GET"])
+def get_portfolios():
+    try:
+        conn = mc.connect(**db_config)
+        cursor = conn.cursor(dictionary=True)
+
+        query = "SELECT id, name, description FROM investment_portfolios ORDER BY id"
+        cursor.execute(query)
+        portfolios = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({"portfolios": portfolios})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/add_portfolio", methods=["POST"])
+def add_portfolio():
+    try:
+        data = request.get_json()
+        name = data.get('name')
+        description = data.get('description', '')
+
+        if not name:
+            return jsonify({"error": "Имя портфеля обязательно"}), 400
+
+        conn = mc.connect(**db_config)
+        cursor = conn.cursor()
+
+        query = "INSERT INTO investment_portfolios (name, description) VALUES (%s, %s)"
+        cursor.execute(query, (name, description))
+
+        portfolio_id = cursor.lastrowid
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "success": True,
+            "portfolio_id": portfolio_id,
+            "name": name
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/save_purchases", methods=["POST"])
+def save_purchases():
+    try:
+        data = request.get_json()
+        portfolio_id = data.get('portfolio_id')
+        purchases = data.get('purchases', [])
+
+        if not portfolio_id:
+            return jsonify({"error": "ID портфеля обязателен"}), 400
+
+        if not purchases:
+            return jsonify({"error": "Нет данных о покупках"}), 400
+
+        conn = mc.connect(**db_config)
+        cursor = conn.cursor()
+
+        # Подготовка запроса для множественной вставки
+        query = """
+            INSERT INTO purchase_transactions 
+            (portfolio_id, coin_id, coin_symbol, coin_name, quantity, price_usd, total_amount, purchase_date) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """
+
+        values = []
+        for purchase in purchases:
+            coin_id = purchase.get('coin_id')
+            coin_symbol = purchase.get('coin_symbol')
+            coin_name = purchase.get('coin_name')
+            quantity = purchase.get('quantity')
+            price_usd = purchase.get('price_usd')
+            purchase_date = purchase.get('purchase_date')
+
+            # Расчет общей суммы
+            total_amount = float(quantity) * float(price_usd)
+
+            values.append((
+                portfolio_id,
+                coin_id,
+                coin_symbol,
+                coin_name,
+                quantity,
+                price_usd,
+                total_amount,
+                purchase_date
+            ))
+
+        cursor.executemany(query, values)
+        conn.commit()
+
+        transaction_count = cursor.rowcount
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "success": True,
+            "message": f"Сохранено {transaction_count} транзакций"
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+# Добавить следующие маршруты в app.py
+
+@app.route("/get_all_tokens", methods=["GET"])
+def get_all_tokens():
+    """
+    Возвращает список всех доступных токенов для выбора.
+    """
+    try:
+        search_term = request.args.get('search', '')
+
+        conn = mc.connect(**db_config)
+        cursor = conn.cursor(dictionary=True)
+
+        # Запрос для получения токенов с фильтрацией по поисковому запросу (если указан)
+        query = """
+            SELECT id, name, symbol, cmc_rank, price_usd, volume_24h
+            FROM cmc_crypto
+            WHERE (name LIKE %s OR symbol LIKE %s)
+            ORDER BY cmc_rank
+            LIMIT 100
+        """
+
+        search_pattern = f"%{search_term}%" if search_term else "%"
+        cursor.execute(query, (search_pattern, search_pattern))
+
+        tokens = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        return jsonify({"tokens": tokens})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/add_to_favourites", methods=["POST"])
+def add_to_favourites():
+    """
+    Добавляет выбранные токены в избранное.
+    """
+    try:
+        data = request.get_json()
+        token_ids = data.get('token_ids', [])
+
+        if not token_ids:
+            return jsonify({"error": "Не указаны токены для добавления"}), 400
+
+        conn = mc.connect(**db_config)
+        cursor = conn.cursor()
+
+        # Проверка существования таблицы избранного
+        cursor.execute("SHOW TABLES LIKE 'cmc_favorites'")
+        table_exists = cursor.fetchone() is not None
+
+        if not table_exists:
+            cursor.execute("""
+                CREATE TABLE cmc_favorites (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    coin_id BIGINT NOT NULL,
+                    UNIQUE KEY (coin_id)
+                )
+            """)
+            conn.commit()
+
+        # Вставка токенов в избранное
+        added_count = 0
+        for token_id in token_ids:
+            try:
+                # Проверяем, существует ли уже запись
+                cursor.execute("SELECT id FROM cmc_favorites WHERE coin_id = %s", (token_id,))
+                if cursor.fetchone() is None:
+                    cursor.execute("INSERT INTO cmc_favorites (coin_id) VALUES (%s)", (token_id,))
+                    added_count += 1
+            except Exception as insert_error:
+                print(f"Error adding token {token_id}: {insert_error}")
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "success": True,
+            "message": f"Добавлено {added_count} токенов в избранное"
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
