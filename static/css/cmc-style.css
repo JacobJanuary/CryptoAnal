@@ -216,3 +216,88 @@ h1 {
     margin-top: 50px;
     font-style: italic;
 }
+/* Стиль для кнопки обновления данных */
+.update-data-btn {
+    background-color: #4299e1;
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+}
+
+.update-data-btn:hover {
+    background-color: #3182ce;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.update-data-btn:active {
+    transform: translateY(0);
+}
+
+.update-data-btn::before {
+    content: "↻";
+    font-size: 16px;
+}
+
+.update-data-btn.loading {
+    background-color: #4a5568;
+    cursor: wait;
+}
+
+.update-data-btn.loading::before {
+    content: "↻";
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+/* Стили для анимации обновленных строк */
+@keyframes highlightUpdate {
+    0% { background-color: rgba(74, 137, 220, 0.3); }
+    100% { background-color: transparent; }
+}
+
+.updated-row {
+    animation: highlightUpdate 2s ease-out;
+}
+
+/* Стили для уведомлений */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 20px;
+    border-radius: 5px;
+    color: white;
+    font-weight: 500;
+    z-index: 9999;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateX(110%);
+    transition: transform 0.3s ease-out;
+    max-width: 350px;
+}
+
+.notification.show {
+    transform: translateX(0);
+}
+
+.notification.success {
+    background-color: #10b981;
+}
+
+.notification.error {
+    background-color: #ef4444;
+}
+
+.notification.warning {
+    background-color: #f59e0b;
+}

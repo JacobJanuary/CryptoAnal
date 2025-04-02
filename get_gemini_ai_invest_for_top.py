@@ -1,20 +1,8 @@
-def wait_with_countdown(minutes):
-    """
-    Ожидание с обратным отсчетом
-    """
-    seconds = minutes * 60
-    for remaining in range(seconds, 0, -1):
-        mins, secs = divmod(remaining, 60)
-        hours, mins = divmod(mins, 60)
-        timer = f"{hours:02d}:{mins:02d}:{secs:02d}"
-        print(f"Ожидание: {timer} до следующей попытки", end="\r")
-        time.sleep(1)
-    print("\nВремя ожидания истекло. Возобновление обработки...")
-
 import os
 import time
 import mysql.connector
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
 # Загрузка переменных окружения
@@ -33,8 +21,19 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 if not GEMINI_API_KEY:
     raise ValueError("API ключ Gemini не найден. Пожалуйста, установите GEMINI_API_KEY в файле .env")
 
-# Настройка клиента Gemini
-genai.configure(api_key=GEMINI_API_KEY)
+
+def wait_with_countdown(minutes):
+    """
+    Ожидание с обратным отсчетом
+    """
+    seconds = minutes * 60
+    for remaining in range(seconds, 0, -1):
+        mins, secs = divmod(remaining, 60)
+        hours, mins = divmod(mins, 60)
+        timer = f"{hours:02d}:{mins:02d}:{secs:02d}"
+        print(f"Ожидание: {timer} до следующей попытки", end="\r")
+        time.sleep(1)
+    print("\nВремя ожидания истекло. Возобновление обработки...")
 
 
 def create_database_connection():
@@ -63,7 +62,7 @@ def fetch_top_cryptocurrencies(conn):
     cursor = conn.cursor(dictionary=True)
 
     # Получаем список id категорий с isTop=1
-    cursor.execute("SELECT id FROM categories WHERE isTop = 1")
+    cursor.execute("SELECT id FROM categories WHERE name = 'Made in America'")
     category_ids = [row['id'] for row in cursor.fetchall()]
 
     if not category_ids:
@@ -91,28 +90,59 @@ def fetch_top_cryptocurrencies(conn):
 
 def query_gemini_for_crypto(crypto_name, crypto_symbol):
     """
-    Отправка запроса к Gemini для получения информации об инвестициях
+    Отправка запроса к Gemini для получения информации о криптовалюте с использованием Google-поиска
     """
-    # Шаблон запроса
-    prompt = f"""Найди информацию об инвестициях в проект {crypto_name} ({crypto_symbol}), включая фонды, суммы инвестиций, даты и цены токенов. Если цены токенов для фондов неизвестны, найди общую сумму инвестиций и количество токенов, выделенных ранним инвесторам, и рассчитай среднюю стоимость токена для фондов.
-
-(1) Найди информацию о раундах финансирования проекта {crypto_name} ({crypto_symbol}).
-(2) Для каждого раунда финансирования определи названия инвестиционных фондов, участвовавших в нем.
-(3) Узнай сумму инвестиций для каждого фонда в каждом раунде, если эта информация доступна.
-(4) Определи дату каждого раунда финансирования.
-(5) Найди цену токена {crypto_symbol} для каждого инвестиционного фонда в каждом раунде, если эта информация доступна.
-(6) Если цена токена для какого-либо фонда неизвестна, найди общую сумму инвестиций, привлеченных проектом от ранних инвесторов.
-(7) Найди общее количество токенов {crypto_symbol}, выделенных ранним инвесторам.
-(8) Рассчитай среднюю стоимость токена {crypto_symbol} для ранних инвесторов, разделив общую сумму инвестиций (из пункта 6) на общее количество выделенных токенов (из пункта 7)."""
-
     try:
-        # Создание модели Gemini
-        model = genai.GenerativeModel(model_name="gemini-2.5-pro-exp-03-25")
+        # Создание клиента Gemini API с нашим ключом
+        client = genai.Client(api_key=GEMINI_API_KEY)
 
-        # Отправка запроса
-        response = model.generate_content(prompt)
+        # Формируем промт, заменяя Sui на имя запрашиваемой криптовалюты
+        prompt_text = f"""Проведи детальный анализ криптовалюты {crypto_name}
+Мне нужен глубокий анализ проекта с использованием всех возможностей искусственного интеллекта.
+Что делает, какую проблему решает проект. Стадия готовности, кем используется и где.
+Исследуй интерес крупного капитала (так называемые whale transactions):
+- Каков интерес крупных держателей к проекту?
+- Какой процент эмиссии держат киты?
+- Наблюдалась ли тенденция к накоплению или продаже токенов китами в течение последнего года?
+Проанализируй интерес и вложения в проект со стороны так называемых \"умных денег\" (Smart money):
+- Какие фонды вложились в проект?
+- Каковы суммы инвестиций фондов?
+- По какой цене фонды приобретали токены?
+- Разблокированы ли уже токены, принадлежащие фондам?
+- Успели ли фонды продать свои токены и получить прибыль, превышающую 20-кратный размер их первоначальных инвестиций?
+Изучи торговлю проектом на централизованных биржах:
+- На каких централизованных биржах торгуется {crypto_name}?
+- Каковы текущие объемы торгов?
+- Наблюдались ли ощутимые всплески объема торгов? Если да, то как ты можешь это охарактеризовать?
+Оцени мнение лидеров индустрии и лидеров мнений о проекте {crypto_name}.
+Выясни дату выхода проекта:
+- Когда был выпущен токен {crypto_name}?
+- Когда состоялся листинг на биржах?
+- Произошло ли это во время бычьего рынка 2021 года или позже/раньше?
+- Какова была максимальная рыночная капитализация проекта?
+Оцени текущую актуальность проекта:
+- В тренде ли сейчас то, чем занимается проект?
+- Насколько сильна команда проекта?
+- К какой стране относится проект? Зарегистрирован ли он в США?
+Проанализируй активность команды разработчиков:
+- Какова активность команды в целом?
+- Какова активность в репозиториях GitHub и других платформах для разработчиков?
+Оцени перспективы проекта:
+- Каковы общие перспективы развития проекта {crypto_name}?
+- Сделай прогноз цены токена на ближайший альтсезон."""
 
-        # Извлечение и возврат текста ответа
+        # Настраиваем конфигурацию для генерации с использованием Google Search
+        response = client.models.generate_content(
+            model="gemini-2.5-pro-exp-03-25",
+            contents=prompt_text,
+            config=types.GenerateContentConfig(
+                tools=[types.Tool(
+                    google_search=types.GoogleSearchRetrieval
+                )]
+            )
+        )
+
+        # Получаем и возвращаем текст ответа
         if hasattr(response, 'text'):
             return response.text
         else:
@@ -170,7 +200,7 @@ def main():
             try:
                 print(f"Обработка {crypto['symbol']} (ID: {crypto['id']})...")
 
-                # Запрос к Gemini
+                # Запрос к Gemini с Google-поиском
                 invest_info = query_gemini_for_crypto(crypto['name'], crypto['symbol'])
 
                 # Проверяем, превышена ли квота
@@ -193,7 +223,7 @@ def main():
                     # Сохранение результата в базу данных
                     updated = save_invest_info_to_db(conn, crypto['id'], invest_info)
                     if updated:
-                        print(f"Информация об инвестициях для {crypto['symbol']} сохранена в базе данных")
+                        print(f"Информация для {crypto['symbol']} сохранена в базе данных")
                     else:
                         print(f"Не удалось сохранить информацию для {crypto['symbol']}")
 
@@ -201,7 +231,7 @@ def main():
                 print(f"Обработано {processed_count} из {len(cryptocurrencies)} криптовалют")
 
                 # Задержка между запросами для соблюдения лимитов API
-                time.sleep(2)
+                time.sleep(5)  # Увеличиваем задержку для работы с Google-поиском
 
             except Exception as e:
                 print(f"Ошибка при обработке {crypto['symbol']}: {str(e)}")
@@ -216,7 +246,7 @@ def main():
                 try:
                     print(f"Обработка отложенной криптовалюты {crypto['symbol']} (ID: {crypto['id']})...")
 
-                    # Запрос к Gemini
+                    # Запрос к Gemini с Google-поиском
                     invest_info = query_gemini_for_crypto(crypto['name'], crypto['symbol'])
 
                     # Снова проверяем, превышена ли квота
@@ -232,7 +262,6 @@ def main():
                         wait_with_countdown(60)
 
                         # Рекурсивно обрабатываем оставшиеся криптовалюты
-                        # (можно реализовать более элегантное решение с использованием циклов)
                         for remaining_crypto in remaining_cryptos:
                             try:
                                 print(
@@ -253,7 +282,7 @@ def main():
                                 retry_processed += 1
                                 print(
                                     f"Обработано {retry_processed} из {len(quota_exceeded_cryptos)} отложенных криптовалют")
-                                time.sleep(2)
+                                time.sleep(5)  # Увеличиваем задержку для работы с Google-поиском
                             except Exception as e:
                                 print(
                                     f"Ошибка при обработке оставшейся криптовалюты {remaining_crypto['symbol']}: {str(e)}")
@@ -266,8 +295,7 @@ def main():
                         # Сохранение результата в базу данных
                         updated = save_invest_info_to_db(conn, crypto['id'], invest_info)
                         if updated:
-                            print(
-                                f"Информация об инвестициях для {crypto['symbol']} сохранена в базе данных после ожидания")
+                            print(f"Информация для {crypto['symbol']} сохранена в базе данных после ожидания")
                         else:
                             print(f"Не удалось сохранить информацию для {crypto['symbol']}")
 
@@ -275,7 +303,7 @@ def main():
                     print(f"Обработано {retry_processed} из {len(quota_exceeded_cryptos)} отложенных криптовалют")
 
                     # Задержка между запросами
-                    time.sleep(2)
+                    time.sleep(5)  # Увеличиваем задержку для работы с Google-поиском
 
                 except Exception as e:
                     print(f"Ошибка при обработке отложенной криптовалюты {crypto['symbol']}: {str(e)}")
@@ -292,5 +320,44 @@ def main():
         print(f"Произошла ошибка: {str(e)}")
 
 
+# Функция для запуска анализа одной конкретной криптовалюты по имени
+def analyze_single_crypto(crypto_name, crypto_symbol):
+    """
+    Анализ одной конкретной криптовалюты по имени и символу
+    """
+    try:
+        print(f"Запуск анализа для {crypto_name} ({crypto_symbol})...")
+        analysis_info = query_gemini_for_crypto(crypto_name, crypto_symbol)
+
+        if analysis_info == "QUOTA_EXCEEDED":
+            print("Квота для запросов к Gemini превышена. Попробуйте позже.")
+            return None
+
+        return analysis_info
+
+    except Exception as e:
+        print(f"Ошибка при анализе {crypto_name}: {str(e)}")
+        return None
+
+
 if __name__ == "__main__":
-    main()
+    # Проверяем наличие аргументов командной строки
+    import sys
+
+    if len(sys.argv) > 2:
+        # Если переданы аргументы, анализируем конкретную криптовалюту
+        crypto_name = sys.argv[1]
+        crypto_symbol = sys.argv[2]
+        result = analyze_single_crypto(crypto_name, crypto_symbol)
+
+        if result:
+            print("\nРезультат анализа:")
+            print(result)
+
+            # Опционально сохраняем в файл
+            with open(f"{crypto_symbol}_analysis.txt", "w", encoding="utf-8") as f:
+                f.write(result)
+            print(f"Результат сохранен в файл {crypto_symbol}_analysis.txt")
+    else:
+        # Если аргументы не переданы, запускаем обработку всех криптовалют из БД
+        main()

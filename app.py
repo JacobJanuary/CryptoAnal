@@ -11,7 +11,8 @@ import mysql.connector as mc
 import json
 import time
 import requests
-from datetime import datetime
+# Добавляем timedelta к импорту
+from datetime import datetime, timedelta
 
 
 app = Flask(__name__)
@@ -401,6 +402,28 @@ def favourites():
         conn = mc.connect(**db_config)
         cursor = conn.cursor(dictionary=True)
 
+        # Получаем список категорий с isTop=1
+        categories_query = """
+            SELECT id, name FROM categories 
+            WHERE isTop = 1 
+            ORDER BY name
+        """
+        cursor.execute(categories_query)
+        top_categories = cursor.fetchall()
+
+        # Для каждой категории считаем количество избранных монет
+        for category in top_categories:
+            count_query = """
+                SELECT COUNT(DISTINCT f.coin_id) as count
+                FROM cmc_favorites f
+                JOIN cmc_category_relations cr ON f.coin_id = cr.coin_id
+                WHERE cr.category_id = %s
+            """
+            cursor.execute(count_query, (category['id'],))
+            count_result = cursor.fetchone()
+            category['coins_count'] = count_result['count'] if count_result else 0
+
+        # Основной запрос для получения избранных монет
         query = f"""
             SELECT c.id,
                    c.name,
@@ -438,7 +461,7 @@ def favourites():
             if coin_ids:
                 format_str = ','.join(['%s'] * len(coin_ids))
                 cursor.execute(f"""
-                    SELECT ccr.coin_id, c.name
+                    SELECT ccr.coin_id, c.id as category_id, c.name
                     FROM cmc_category_relations ccr
                     JOIN categories c ON ccr.category_id = c.id
                     WHERE ccr.coin_id IN ({format_str})
@@ -448,23 +471,33 @@ def favourites():
 
                 from collections import defaultdict
                 cat_map = defaultdict(list)
+                cat_id_map = defaultdict(list)
+
                 for r in rows:
                     c_id = r['coin_id']
+                    cat_id = r['category_id']
                     cat_name = r['name']
                     cat_map[c_id].append(cat_name)
+                    cat_id_map[c_id].append(str(cat_id))
 
                 for coin in coins:
                     c_id = coin['id']
-                    categories_list = cat_map.get(c_id, [])
-                    coin['categories_str'] = ", ".join(categories_list)
+                    coin['categories_str'] = ", ".join(cat_map.get(c_id, []))
+                    coin['category_ids'] = ",".join(cat_id_map.get(c_id, []))
 
         cursor.close()
         conn.close()
 
+        # Определяем opposite_order для сортировки
         opposite_order = 'desc' if order == 'asc' else 'asc'
 
-        return render_template("cmc_favourites.html", coins=coins, current_sort=sort_by, current_order=order,
-                               opposite_order=opposite_order)
+        # Передаем все необходимые переменные в шаблон
+        return render_template("cmc_favourites.html",
+                               coins=coins,  # Определяем переменную coins
+                               current_sort=sort_by,
+                               current_order=order,
+                               opposite_order=opposite_order,  # Определяем переменную opposite_order
+                               top_categories=top_categories)
 
     except Exception as e:
         traceback.print_exc()
@@ -809,6 +842,591 @@ def add_to_favourites():
         return jsonify({
             "success": True,
             "message": f"Добавлено {added_count} токенов в избранное"
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+# Добавьте эти маршруты в ваш файл app.py
+
+# Страница со списком всех портфелей
+@app.route("/portfolios")
+def portfolios_list():
+    """
+    Отображает страницу со списком всех портфелей пользователя.
+    """
+    try:
+        conn = mc.connect(**db_config)
+        cursor = conn.cursor(dictionary=True)
+
+        # Запрос для получения списка портфелей
+        query = """
+            SELECT 
+                p.id, 
+                p.name, 
+                p.description,
+                COUNT(DISTINCT pt.coin_id) as coins_count,
+                SUM(pt.total_amount) as total_invested,
+                p.created_at
+            FROM investment_portfolios p
+            LEFT JOIN purchase_transactions pt ON p.id = pt.portfolio_id
+            GROUP BY p.id
+            ORDER BY p.name
+        """
+        cursor.execute(query)
+        portfolios = cursor.fetchall()
+
+        # Для каждого портфеля получаем текущую стоимость
+        for portfolio in portfolios:
+            if portfolio['coins_count'] > 0:
+                # Запрос для получения текущей стоимости портфеля
+                current_value_query = """
+                    SELECT 
+                        SUM(pt.quantity * c.price_usd) as current_value
+                    FROM purchase_transactions pt
+                    JOIN cmc_crypto c ON pt.coin_id = c.id
+                    WHERE pt.portfolio_id = %s
+                """
+                cursor.execute(current_value_query, (portfolio['id'],))
+                result = cursor.fetchone()
+                portfolio['current_value'] = result['current_value'] if result and result['current_value'] else 0
+
+                # Расчет прибыли/убытка
+                if portfolio['total_invested'] and portfolio['current_value']:
+                    portfolio['profit_loss'] = portfolio['current_value'] - portfolio['total_invested']
+                    portfolio['profit_loss_percent'] = (portfolio['profit_loss'] / portfolio['total_invested']) * 100
+                else:
+                    portfolio['profit_loss'] = 0
+                    portfolio['profit_loss_percent'] = 0
+            else:
+                portfolio['current_value'] = 0
+                portfolio['profit_loss'] = 0
+                portfolio['profit_loss_percent'] = 0
+
+        cursor.close()
+        conn.close()
+
+        return render_template("portfolios_list.html", portfolios=portfolios)
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/portfolio/<int:portfolio_id>")
+def portfolio_detail(portfolio_id):
+    """
+    Отображает детальную страницу конкретного портфеля.
+    """
+    try:
+        conn = mc.connect(**db_config)
+        cursor = conn.cursor(dictionary=True)
+
+        # Получаем информацию о портфеле
+        portfolio_query = """
+            SELECT id, name, description, created_at
+            FROM investment_portfolios
+            WHERE id = %s
+        """
+        cursor.execute(portfolio_query, (portfolio_id,))
+        portfolio = cursor.fetchone()
+
+        if not portfolio:
+            return jsonify({"error": "Портфель не найден"}), 404
+
+        # Получаем все транзакции по портфелю, сгруппированные по монетам
+        transactions_query = """
+            SELECT 
+                pt.coin_id,
+                pt.coin_name,
+                pt.coin_symbol,
+                c.price_usd as current_price,
+                SUM(pt.quantity) as total_quantity,
+                SUM(pt.total_amount) as total_invested,
+                AVG(pt.price_usd) as avg_buy_price,
+                MAX(pt.purchase_date) as last_purchase_date,
+                COUNT(pt.id) as transactions_count
+            FROM purchase_transactions pt
+            LEFT JOIN cmc_crypto c ON pt.coin_id = c.id
+            WHERE pt.portfolio_id = %s
+            GROUP BY pt.coin_id, pt.coin_symbol, pt.coin_name
+            ORDER BY total_invested DESC
+        """
+        cursor.execute(transactions_query, (portfolio_id,))
+        assets = cursor.fetchall()
+
+        # Рассчитываем текущую стоимость и прибыль/убыток для каждой монеты
+        total_current_value = 0
+        total_invested = 0
+
+        for asset in assets:
+            if asset['current_price'] and asset['total_quantity']:
+                asset['current_value'] = asset['current_price'] * asset['total_quantity']
+                asset['profit_loss'] = asset['current_value'] - asset['total_invested']
+                asset['profit_loss_percent'] = (asset['profit_loss'] / asset['total_invested']) * 100 if asset[
+                    'total_invested'] else 0
+
+                total_current_value += asset['current_value']
+                total_invested += asset['total_invested']
+            else:
+                asset['current_value'] = 0
+                asset['profit_loss'] = 0
+                asset['profit_loss_percent'] = 0
+
+        # Получаем полную историю транзакций для этого портфеля
+        history_query = """
+            SELECT 
+                pt.id,
+                pt.coin_id, 
+                pt.coin_name, 
+                pt.coin_symbol, 
+                pt.quantity, 
+                pt.price_usd, 
+                pt.total_amount, 
+                pt.purchase_date
+            FROM purchase_transactions pt
+            WHERE pt.portfolio_id = %s
+            ORDER BY pt.purchase_date DESC
+        """
+        cursor.execute(history_query, (portfolio_id,))
+        transaction_history = cursor.fetchall()
+
+        # Общая статистика портфеля
+        portfolio_stats = {
+            'total_invested': total_invested,
+            'current_value': total_current_value,
+            'profit_loss': total_current_value - total_invested,
+            'profit_loss_percent': (
+                        (total_current_value - total_invested) / total_invested * 100) if total_invested else 0,
+            'assets_count': len(assets),
+            'transactions_count': len(transaction_history)
+        }
+
+        cursor.close()
+        conn.close()
+
+        return render_template(
+            "portfolio_detail.html",
+            portfolio=portfolio,
+            assets=assets,
+            transaction_history=transaction_history,
+            stats=portfolio_stats
+        )
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/portfolio/<int:portfolio_id>/performance")
+def portfolio_performance(portfolio_id):
+    """
+    API-маршрут для получения исторических данных о производительности портфеля.
+    Используется для построения графиков.
+    """
+    try:
+        # Получаем период из параметров запроса (7d, 30d, 90d, all)
+        period = request.args.get('period', 'all')
+
+        conn = mc.connect(**db_config)
+        cursor = conn.cursor(dictionary=True)
+
+        # Запрос для получения истории транзакций портфеля
+        query = """
+            SELECT 
+                pt.purchase_date,
+                pt.coin_id,
+                pt.quantity,
+                pt.price_usd,
+                pt.total_amount
+            FROM purchase_transactions pt
+            WHERE pt.portfolio_id = %s
+            ORDER BY pt.purchase_date
+        """
+        cursor.execute(query, (portfolio_id,))
+        transactions = cursor.fetchall()
+
+        # Получение исторических цен для монет в портфеле (в реальном проекте здесь должен быть
+        # запрос к базе данных с историческими ценами, но для простоты примера используем текущие цены)
+        coin_ids = list(set(t['coin_id'] for t in transactions))
+
+        if coin_ids:
+            format_str = ','.join(['%s'] * len(coin_ids))
+            price_query = f"""
+                SELECT id, price_usd
+                FROM cmc_crypto
+                WHERE id IN ({format_str})
+            """
+            cursor.execute(price_query, tuple(coin_ids))
+            current_prices = {row['id']: row['price_usd'] for row in cursor.fetchall()}
+        else:
+            current_prices = {}
+
+        cursor.close()
+        conn.close()
+
+        # Создаем временную шкалу в зависимости от выбранного периода
+        now = datetime.now()
+        if period == '7d':
+            start_date = now - timedelta(days=7)
+        elif period == '30d':
+            start_date = now - timedelta(days=30)
+        elif period == '90d':
+            start_date = now - timedelta(days=90)
+        else:  # 'all'
+            start_date = min([t['purchase_date'] for t in transactions]) if transactions else now - timedelta(days=30)
+
+        # Создаем массив дат для графика
+        date_range = []
+        current_date = start_date
+        while current_date <= now:
+            date_range.append(current_date)
+            current_date += timedelta(days=1)
+
+        # Расчет портфельных значений для каждой даты
+        performance_data = []
+
+        for date in date_range:
+            # Фильтруем транзакции до текущей даты
+            relevant_transactions = [t for t in transactions if t['purchase_date'].date() <= date.date()]
+
+            # Группируем транзакции по монетам для расчета общего количества каждой монеты
+            coin_quantities = {}
+            invested_value = 0
+
+            for t in relevant_transactions:
+                coin_id = t['coin_id']
+                if coin_id not in coin_quantities:
+                    coin_quantities[coin_id] = 0
+                coin_quantities[coin_id] += t['quantity']
+                invested_value += t['total_amount']
+
+            # Рассчитываем стоимость портфеля на дату
+            portfolio_value = sum(
+                coin_quantities.get(coin_id, 0) * current_prices.get(coin_id, 0)
+                for coin_id in coin_quantities
+            )
+
+            performance_data.append({
+                'date': date.strftime('%Y-%m-%d'),
+                'value': portfolio_value,
+                'invested': invested_value
+            })
+
+        return jsonify({
+            'performance': performance_data
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/portfolio/<int:portfolio_id>/composition")
+def portfolio_composition(portfolio_id):
+    """
+    API-маршрут для получения данных о составе портфеля.
+    Используется для построения круговой диаграммы.
+    """
+    try:
+        # Добавим отладочный вывод
+        print(f"Запрос состава портфеля {portfolio_id}")
+
+        conn = mc.connect(**db_config)
+        cursor = conn.cursor(dictionary=True)
+
+        # Проверим, есть ли транзакции для этого портфеля
+        check_query = "SELECT COUNT(*) as count FROM purchase_transactions WHERE portfolio_id = %s"
+        cursor.execute(check_query, (portfolio_id,))
+        count_result = cursor.fetchone()
+
+        if not count_result or count_result['count'] == 0:
+            print(f"Портфель {portfolio_id} не содержит транзакций")
+            return jsonify({"composition": []})
+
+        # Запрос для получения состава портфеля - исправленная версия
+        query = """
+            SELECT 
+                pt.coin_id,
+                ANY_VALUE(pt.coin_name) as coin_name,
+                pt.coin_symbol,
+                ANY_VALUE(c.price_usd) as current_price,
+                SUM(pt.quantity) as total_quantity,
+                SUM(pt.total_amount) as total_invested
+            FROM purchase_transactions pt
+            LEFT JOIN cmc_crypto c ON pt.coin_id = c.id
+            WHERE pt.portfolio_id = %s
+            GROUP BY pt.coin_id, pt.coin_symbol
+            ORDER BY total_invested DESC
+        """
+        cursor.execute(query, (portfolio_id,))
+        assets = cursor.fetchall()
+
+        print(f"Найдено активов: {len(assets)}")
+
+        # Расчет текущей стоимости для каждого актива
+        composition_data = []
+        for asset in assets:
+            print(f"Обработка актива: {asset['coin_symbol']} ({asset['coin_id']})")
+            print(f"  - Текущая цена: {asset['current_price']}")
+            print(f"  - Количество: {asset['total_quantity']}")
+
+            if asset['current_price'] is not None and asset['total_quantity'] is not None:
+                current_value = float(asset['current_price']) * float(asset['total_quantity'])
+                print(f"  - Текущая стоимость: ${current_value}")
+
+                composition_data.append({
+                    'name': asset['coin_symbol'],
+                    'full_name': asset['coin_name'],
+                    'value': current_value
+                })
+            else:
+                if asset['current_price'] is None:
+                    print(f"  - ОШИБКА: Нет текущей цены для монеты {asset['coin_symbol']}")
+                if asset['total_quantity'] is None:
+                    print(f"  - ОШИБКА: Нет количества для монеты {asset['coin_symbol']}")
+
+        cursor.close()
+        conn.close()
+
+        print(f"Отправка данных о составе портфеля: {composition_data}")
+        return jsonify({"composition": composition_data})
+
+    except Exception as e:
+        traceback.print_exc()
+        print(f"Ошибка в получении состава портфеля: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/portfolio/<int:portfolio_id>/update_prices", methods=["POST"])
+def update_portfolio_prices(portfolio_id):
+    """
+    API-маршрут для обновления цен всех монет в портфеле.
+    """
+    try:
+        conn = mc.connect(**db_config)
+        cursor = conn.cursor(dictionary=True)
+
+        # Получаем все уникальные монеты в портфеле
+        query = """
+            SELECT DISTINCT coin_id, coin_symbol
+            FROM purchase_transactions
+            WHERE portfolio_id = %s
+        """
+        cursor.execute(query, (portfolio_id,))
+        portfolio_coins = cursor.fetchall()
+
+        if not portfolio_coins:
+            return jsonify({"error": "В портфеле нет монет"}), 400
+
+        # Подготовка параметров для запроса к CoinMarketCap API
+        symbols = ','.join([coin['coin_symbol'] for coin in portfolio_coins])
+
+        if not CMC_API_KEY:
+            return jsonify({"error": "API ключ CoinMarketCap не настроен"}), 400
+
+        # Запрос к API CoinMarketCap
+        url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest'
+        parameters = {
+            'symbol': symbols,
+            'convert': 'USD'
+        }
+        headers = {
+            'Accepts': 'application/json',
+            'X-CMC_PRO_API_KEY': CMC_API_KEY,
+        }
+
+        response = requests.get(url, headers=headers, params=parameters)
+        data = response.json()
+
+        if 'status' not in data or data['status']['error_code'] != 0:
+            error_msg = data.get('status', {}).get('error_message', 'Unknown error')
+            return jsonify({"error": f"Ошибка API CoinMarketCap: {error_msg}"}), 400
+
+        # Обновление цен в базе данных
+        update_count = 0
+        for coin in portfolio_coins:
+            symbol = coin['coin_symbol']
+            if symbol in data['data']:
+                coin_data = data['data'][symbol]
+                price = coin_data['quote']['USD']['price']
+
+                # Обновляем цену в базе данных
+                update_query = """
+                    UPDATE cmc_crypto
+                    SET price_usd = %s, 
+                        last_updated = NOW()
+                    WHERE id = %s
+                """
+                cursor.execute(update_query, (price, coin['coin_id']))
+                update_count += 1
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "success": True,
+            "message": f"Обновлены цены для {update_count} монет",
+            "updated_coins": update_count
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/portfolio/<int:portfolio_id>/delete_transaction", methods=["POST"])
+def delete_transaction(portfolio_id):
+    """
+    API-маршрут для удаления транзакции.
+    """
+    try:
+        data = request.get_json()
+        transaction_id = data.get('transaction_id')
+
+        if not transaction_id:
+            return jsonify({"error": "ID транзакции не указан"}), 400
+
+        conn = mc.connect(**db_config)
+        cursor = conn.cursor()
+
+        # Проверяем, существует ли транзакция и принадлежит ли она указанному портфелю
+        check_query = """
+            SELECT id FROM purchase_transactions
+            WHERE id = %s AND portfolio_id = %s
+        """
+        cursor.execute(check_query, (transaction_id, portfolio_id))
+        exists = cursor.fetchone() is not None
+
+        if not exists:
+            cursor.close()
+            conn.close()
+            return jsonify({"error": "Транзакция не найдена или не принадлежит указанному портфелю"}), 404
+
+        # Удаляем транзакцию
+        delete_query = """
+            DELETE FROM purchase_transactions
+            WHERE id = %s
+        """
+        cursor.execute(delete_query, (transaction_id,))
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "success": True,
+            "message": "Транзакция успешно удалена"
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/update_favourite_tokens", methods=["POST"])
+def update_favourite_tokens():
+    try:
+        # Получаем список всех монет из избранного
+        conn = mc.connect(**db_config)
+        cursor = conn.cursor(dictionary=True)
+
+        # Запрос для получения символов всех избранных монет
+        query = """
+            SELECT c.symbol 
+            FROM cmc_crypto c
+            JOIN cmc_favorites f ON c.id = f.coin_id
+        """
+        cursor.execute(query)
+        favorites = cursor.fetchall()
+
+        if not favorites:
+            return jsonify({"error": "Нет избранных монет"}), 400
+
+        # Подготовка параметров для запроса к CoinMarketCap API
+        symbols = ','.join([coin['symbol'] for coin in favorites])
+
+        if not CMC_API_KEY:
+            return jsonify({"error": "API ключ CoinMarketCap не настроен"}), 400
+
+        # Запрос к API CoinMarketCap
+        url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest'
+        parameters = {
+            'symbol': symbols,
+            'convert': 'USD'
+        }
+        headers = {
+            'Accepts': 'application/json',
+            'X-CMC_PRO_API_KEY': CMC_API_KEY,
+        }
+
+        response = requests.get(url, headers=headers, params=parameters)
+        data = response.json()
+
+        if 'status' not in data or data['status']['error_code'] != 0:
+            error_msg = data.get('status', {}).get('error_message', 'Unknown error')
+            return jsonify({"error": f"Ошибка API CoinMarketCap: {error_msg}"}), 400
+
+        # Обновление данных в базе данных
+        update_count = 0
+
+        for symbol in data['data']:
+            coin_data = data['data'][symbol]
+
+            # Получаем основные данные для обновления
+            coin_id = coin_data['id']
+            price = coin_data['quote']['USD']['price']
+            percent_change_1h = coin_data['quote']['USD']['percent_change_1h']
+            percent_change_24h = coin_data['quote']['USD']['percent_change_24h']
+            percent_change_7d = coin_data['quote']['USD']['percent_change_7d']
+            percent_change_30d = coin_data['quote']['USD'].get('percent_change_30d')
+            percent_change_60d = coin_data['quote']['USD'].get('percent_change_60d')
+            percent_change_90d = coin_data['quote']['USD'].get('percent_change_90d')
+            market_cap = coin_data['quote']['USD']['market_cap']
+            volume_24h = coin_data['quote']['USD']['volume_24h']
+
+            # Обновляем данные в таблице cmc_crypto
+            update_query = """
+                UPDATE cmc_crypto
+                SET price_usd = %s,
+                    percent_change_1h = %s,
+                    percent_change_24h = %s,
+                    percent_change_7d = %s,
+                    percent_change_30d = %s,
+                    percent_change_60d = %s,
+                    percent_change_90d = %s,
+                    market_cap = %s,
+                    volume_24h = %s,
+                    last_updated = NOW()
+                WHERE id = %s
+            """
+
+            cursor.execute(update_query, (
+                price,
+                percent_change_1h,
+                percent_change_24h,
+                percent_change_7d,
+                percent_change_30d,
+                percent_change_60d,
+                percent_change_90d,
+                market_cap,
+                volume_24h,
+                coin_id
+            ))
+
+            update_count += 1
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "success": True,
+            "message": f"Данные обновлены для {update_count} монет",
+            "updated_count": update_count
         })
 
     except Exception as e:

@@ -1,0 +1,133 @@
+/* Современный стиль фильтра категорий */
+.filter-container {
+    background-color: #ffffff;
+    border-radius: 10px;
+    padding: 16px;
+    margin: 15px 0;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.filter-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 15px;
+}
+
+.filter-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+}
+
+.filter-counter {
+    font-size: 14px;
+    color: #666;
+    background-color: #f5f8ff;
+    padding: 4px 10px;
+    border-radius: 15px;
+}
+
+.filter-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.filter-btn {
+    background-color: #f0f4f8;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 14px;
+    color: #4a5568;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-weight: 500;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.filter-btn:hover {
+    background-color: #e2e8f0;
+    transform: translateY(-1px);
+}
+
+.filter-btn.select-all {
+    background-color: #ebf5ff;
+    color: #3182ce;
+}
+
+.filter-btn.deselect-all {
+    background-color: #f9f9f9;
+    color: #718096;
+}
+
+.category-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.category-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    background-color: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 9999px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.category-chip:hover {
+    border-color: #cbd5e0;
+    transform: translateY(-1px);
+}
+
+.category-chip.active {
+    background-color: #4299e1;
+    border-color: #3182ce;
+    color: white;
+}
+
+.category-name {
+    font-weight: 500;
+}
+
+.category-count {
+    background-color: rgba(255, 255, 255, 0.25);
+    border-radius: 9999px;
+    padding: 2px 8px;
+    font-size: 12px;
+    margin-left: 8px;
+    font-weight: 600;
+}
+
+.category-chip:not(.active) .category-count {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.other-category {
+    background-color: #f0f4f8;
+    border-color: #cbd5e0;
+}
+
+.other-category.active {
+    background-color: #718096;
+    border-color: #4a5568;
+}
+
+#empty-filter-message {
+    display: none;
+    text-align: center;
+    padding: 15px;
+    margin: 10px 0;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    color: #6c757d;
+    font-size: 14px;
+}

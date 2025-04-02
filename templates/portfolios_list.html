@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мои портфели</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cmc-style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/portfolio-styles.css') }}">
+</head>
+<body>
+    <!-- Навигационные кнопки -->
+    <div class="navigation-buttons">
+        <button onclick="window.location.href='/'">На главную</button>
+        <button onclick="window.location.href='/cmc_favourites'">Избранные монеты</button>
+    </div>
+
+    <h1>Мои инвестиционные портфели</h1>
+
+    <!-- Краткая статистика -->
+    <div class="portfolio-summary">
+        <div class="summary-card">
+            <div class="summary-value">{{ portfolios|length }}</div>
+            <div class="summary-label">Портфелей</div>
+        </div>
+        {% set total_invested = portfolios|sum(attribute='total_invested') %}
+        {% set total_current = portfolios|sum(attribute='current_value') %}
+        {% set total_profit = total_current - total_invested %}
+        {% set total_profit_percent = (total_profit / total_invested * 100) if total_invested else 0 %}
+        <div class="summary-card">
+            <div class="summary-value">${{ '%.2f'|format(total_invested) }}</div>
+            <div class="summary-label">Инвестировано</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-value">${{ '%.2f'|format(total_current) }}</div>
+            <div class="summary-label">Текущая стоимость</div>
+        </div>
+        <div class="summary-card {% if total_profit > 0 %}profit{% elif total_profit < 0 %}loss{% endif %}">
+            <div class="summary-value">{{ '+' if total_profit > 0 else '' }}${{ '%.2f'|format(total_profit) }} ({{ '+' if total_profit_percent > 0 else '' }}{{ '%.2f'|format(total_profit_percent) }}%)</div>
+            <div class="summary-label">Прибыль/Убыток</div>
+        </div>
+    </div>
+
+    <!-- Список портфелей -->
+    <div class="portfolios-grid">
+        {% for portfolio in portfolios %}
+        <div class="portfolio-card" onclick="window.location.href='/portfolio/{{ portfolio.id }}'">
+            <div class="portfolio-header">
+                <h2>{{ portfolio.name }}</h2>
+                <span class="portfolio-date">Создан: {{ portfolio.created_at.strftime('%d.%m.%Y') }}</span>
+            </div>
+            <div class="portfolio-body">
+                {% if portfolio.description %}
+                <p class="portfolio-description">{{ portfolio.description }}</p>
+                {% endif %}
+                <div class="portfolio-stats">
+                    <div class="stat-item">
+                        <div class="stat-value">{{ portfolio.coins_count }}</div>
+                        <div class="stat-label">Монет</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${{ '%.2f'|format(portfolio.total_invested) }}</div>
+                        <div class="stat-label">Инвестировано</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${{ '%.2f'|format(portfolio.current_value) }}</div>
+                        <div class="stat-label">Стоимость</div>
+                    </div>
+                </div>
+                <div class="portfolio-profit {% if portfolio.profit_loss > 0 %}profit{% elif portfolio.profit_loss < 0 %}loss{% endif %}">
+                    {{ '+' if portfolio.profit_loss > 0 else '' }}${{ '%.2f'|format(portfolio.profit_loss) }} 
+                    ({{ '+' if portfolio.profit_loss_percent > 0 else '' }}{{ '%.2f'|format(portfolio.profit_loss_percent) }}%)
+                </div>
+            </div>
+            <div class="portfolio-footer">
+                <button class="view-button">Просмотреть детали</button>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-message">
+            <p>У вас пока нет инвестиционных портфелей</p>
+            <p>Создайте портфель на странице <a href="/cmc_favourites">избранных монет</a></p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Подключение JavaScript -->
+    <script src="{{ url_for('static', filename='portfolios-list.js') }}"></script>
+</body>
+</html>

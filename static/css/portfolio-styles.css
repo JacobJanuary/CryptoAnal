@@ -1,0 +1,595 @@
+/* Общие стили для страниц портфелей */
+:root {
+    --primary-color: #4a89dc;
+    --secondary-color: #5d9cec;
+    --dark-color: #2c3e50;
+    --light-color: #f5f7fa;
+    --success-color: #2ecc71;
+    --danger-color: #e74c3c;
+    --warning-color: #f39c12;
+    --gray-color: #95a5a6;
+    --border-color: #dfe6e9;
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --card-radius: 10px;
+    --transition-speed: 0.3s;
+}
+
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background-color: #f5f7fa;
+    color: #333;
+    line-height: 1.6;
+}
+
+h1, h2, h3, h4 {
+    font-weight: 600;
+    color: var(--dark-color);
+}
+
+button {
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.2s;
+}
+
+button:hover {
+    transform: translateY(-2px);
+}
+
+/* Сводка портфеля */
+.portfolio-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 30px;
+    justify-content: center;
+}
+
+.summary-card {
+    background-color: white;
+    border-radius: var(--card-radius);
+    padding: 20px;
+    box-shadow: 0 4px 6px var(--shadow-color);
+    flex: 1;
+    min-width: 200px;
+    max-width: 300px;
+    text-align: center;
+    transition: transform var(--transition-speed);
+}
+
+.summary-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 12px var(--shadow-color);
+}
+
+.summary-value {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: var(--dark-color);
+}
+
+.summary-label {
+    font-size: 14px;
+    color: var(--gray-color);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.summary-card.profit .summary-value {
+    color: var(--success-color);
+}
+
+.summary-card.loss .summary-value {
+    color: var(--danger-color);
+}
+
+/* Сетка портфелей */
+.portfolios-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 25px;
+    margin-top: 30px;
+}
+
+.portfolio-card {
+    background-color: white;
+    border-radius: var(--card-radius);
+    box-shadow: 0 4px 6px var(--shadow-color);
+    overflow: hidden;
+    transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(20px);
+}
+
+.portfolio-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px var(--shadow-color);
+}
+
+.portfolio-header {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    padding: 15px 20px;
+    position: relative;
+}
+
+.portfolio-header h2 {
+    margin: 0;
+    font-size: 20px;
+    color: white;
+}
+
+.portfolio-date {
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.portfolio-body {
+    padding: 20px;
+}
+
+.portfolio-description {
+    color: #666;
+    margin-bottom: 15px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.portfolio-stats {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.stat-item {
+    flex: 1;
+}
+
+.stat-value {
+    font-weight: bold;
+    font-size: 18px;
+}
+
+.stat-label {
+    font-size: 12px;
+    color: var(--gray-color);
+}
+
+.portfolio-profit {
+    text-align: center;
+    font-weight: bold;
+    font-size: 18px;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+}
+
+.portfolio-profit.profit {
+    color: var(--success-color);
+    background-color: rgba(46, 204, 113, 0.1);
+}
+
+.portfolio-profit.loss {
+    color: var(--danger-color);
+    background-color: rgba(231, 76, 60, 0.1);
+}
+
+.portfolio-footer {
+    padding: 15px 20px;
+    border-top: 1px solid var(--border-color);
+    text-align: center;
+}
+
+.view-button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.view-button:hover {
+    background-color: var(--secondary-color);
+}
+
+/* Сообщение о пустом списке */
+.empty-message {
+    text-align: center;
+    padding: 50px 20px;
+    background-color: white;
+    border-radius: var(--card-radius);
+    box-shadow: 0 4px 6px var(--shadow-color);
+    grid-column: 1 / -1;
+    color: var(--gray-color);
+}
+
+.empty-message p {
+    margin: 10px 0;
+}
+
+.empty-message a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: bold;
+}
+
+/* Стили для страницы деталей портфеля */
+.portfolio-header-section {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.portfolio-header-section h1 {
+    margin-bottom: 5px;
+    color: var(--dark-color);
+}
+
+.portfolio-meta {
+    font-size: 14px;
+    color: var(--gray-color);
+}
+
+.portfolio-dashboard {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 25px;
+    margin-top: 30px;
+}
+
+.dashboard-column {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+}
+
+.dashboard-card {
+    background-color: white;
+    border-radius: var(--card-radius);
+    box-shadow: 0 4px 6px var(--shadow-color);
+    overflow: hidden;
+}
+
+.card-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-header h2 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.card-body {
+    padding: 20px;
+}
+
+.period-selector {
+    display: flex;
+    gap: 5px;
+}
+
+.period-btn {
+    background-color: #f0f0f0;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #666;
+}
+
+.period-btn.active {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.composition-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: center;
+}
+
+.pie-chart-container {
+    height: 250px;
+    position: relative;
+}
+
+.composition-legend {
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.legend-item:hover {
+    background-color: #f0f0f0;
+}
+
+.legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.legend-label {
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Таблицы */
+.table-container {
+    overflow-x: auto;
+    margin-bottom: 10px;
+}
+
+.assets-table, .transactions-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.assets-table th, .transactions-table th {
+    background-color: var(--dark-color);
+    color: white;
+    text-align: left;
+    padding: 12px 15px;
+    position: sticky;
+    top: 0;
+}
+
+.assets-table td, .transactions-table td {
+    padding: 10px 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.assets-table tr:hover, .transactions-table tr:hover {
+    background-color: #f8f9fa;
+}
+
+.asset-name, .tx-coin {
+    font-weight: bold;
+}
+
+.asset-full-name, .tx-coin-name {
+    font-size: 12px;
+    color: var(--gray-color);
+}
+
+.profit {
+    color: var(--success-color);
+}
+
+.loss {
+    color: var(--danger-color);
+}
+
+.percent {
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.delete-tx-btn {
+    background-color: var(--danger-color);
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.delete-tx-btn:hover {
+    background-color: #c0392b;
+}
+
+/* Модальное окно подтверждения - ИСПРАВЛЕНО */
+#confirmModal {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+#confirmModal .modal-content {
+    background-color: white;
+    margin: 15% auto;
+    padding: 0;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    width: 400px;
+    max-width: 90%;
+    position: relative;
+}
+
+.modal-header {
+    background-color: var(--dark-color);
+    color: white;
+    padding: 15px 20px;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 18px;
+    color: white;
+}
+
+.modal-close {
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-footer {
+    padding: 15px 20px;
+    border-top: 1px solid var(--border-color);
+    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.cancel-btn {
+    background-color: #95a5a6;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.confirm-btn {
+    background-color: var(--danger-color);
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.cancel-btn:hover {
+    background-color: #7f8c8d;
+}
+
+.confirm-btn:hover {
+    background-color: #c0392b;
+}
+
+/* Спиннер загрузки */
+.spinner-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 1050;
+    justify-content: center;
+    align-items: center;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Уведомления */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 20px;
+    background-color: var(--success-color);
+    color: white;
+    border-radius: 4px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    z-index: 1100;
+    transform: translateX(120%);
+    transition: transform 0.3s ease-out;
+    max-width: 300px;
+}
+
+.notification.show {
+    transform: translateX(0);
+}
+
+.notification.error {
+    background-color: var(--danger-color);
+}
+
+.notification.warning {
+    background-color: var(--warning-color);
+}
+
+/* Адаптивность */
+@media (max-width: 1200px) {
+    .portfolio-dashboard {
+        grid-template-columns: 1fr;
+    }
+
+    .composition-container {
+        grid-template-columns: 1fr;
+    }
+
+    .pie-chart-container {
+        margin: 0 auto;
+        max-width: 300px;
+    }
+}
+
+@media (max-width: 768px) {
+    .portfolios-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .portfolio-summary {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .summary-card {
+        width: 100%;
+        max-width: none;
+    }
+
+    .period-selector {
+        flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 480px) {
+    .card-header {
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+    }
+
+    .period-selector {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .portfolio-stats {
+        flex-direction: column;
+        gap: 15px;
+    }
+}

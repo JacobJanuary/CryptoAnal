@@ -159,7 +159,7 @@ function showCoinDetails(coinId) {
                     </div>`;
 
             // Добавляем раздел аналитики, если он доступен
-            if (data.AI_text) {
+            if (data.AI_text && !data.gemini_invest) {
                 html += `
                     <!-- Раздел аналитики -->
                     <div class="coin-section">
@@ -174,7 +174,7 @@ function showCoinDetails(coinId) {
             }
 
             // Добавляем инвестиционный анализ, если он доступен
-            if (data.AI_invest) {
+            if (data.AI_invest && !data.gemini_invest) {
                 html += `
                     <!-- Инвестиционный анализ -->
                     <div class="coin-section">

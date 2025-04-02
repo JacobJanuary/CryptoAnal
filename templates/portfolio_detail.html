@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ portfolio.name }} - Портфель</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cmc-style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/portfolio-styles.css') }}">
+    <!-- Подключение Chart.js для графиков -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Подключение Moment.js для работы с датами -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/locale/ru.min.js"></script>
+</head>
+<body>
+    <!-- Навигационные кнопки -->
+    <div class="navigation-buttons">
+        <button onclick="window.location.href='/portfolios'">К списку портфелей</button>
+        <button onclick="window.location.href='/cmc_favourites'">Избранные монеты</button>
+        <button id="update-prices-btn">Обновить цены</button>
+    </div>
+
+    <!-- Заголовок портфеля -->
+    <div class="portfolio-header-section">
+        <h1>{{ portfolio.name }}</h1>
+        {% if portfolio.description %}
+        <p class="portfolio-description">{{ portfolio.description }}</p>
+        {% endif %}
+        <div class="portfolio-meta">
+            <span>Создан: {{ portfolio.created_at.strftime('%d.%m.%Y') }}</span>
+        </div>
+    </div>
+
+    <!-- Карточки со статистикой -->
+    <div class="portfolio-summary">
+        <div class="summary-card">
+            <div class="summary-value">${{ '%.2f'|format(stats.total_invested) }}</div>
+            <div class="summary-label">Инвестировано</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-value">${{ '%.2f'|format(stats.current_value) }}</div>
+            <div class="summary-label">Текущая стоимость</div>
+        </div>
+        <div class="summary-card {% if stats.profit_loss > 0 %}profit{% elif stats.profit_loss < 0 %}loss{% endif %}">
+            <div class="summary-value">{{ '+' if stats.profit_loss > 0 else '' }}${{ '%.2f'|format(stats.profit_loss) }}</div>
+            <div class="summary-label">Прибыль/Убыток</div>
+        </div>
+        <div class="summary-card {% if stats.profit_loss_percent > 0 %}profit{% elif stats.profit_loss_percent < 0 %}loss{% endif %}">
+            <div class="summary-value">{{ '+' if stats.profit_loss_percent > 0 else '' }}{{ '%.2f'|format(stats.profit_loss_percent) }}%</div>
+            <div class="summary-label">Доходность</div>
+        </div>
+    </div>
+
+    <!-- Две колонки: графики и состав портфеля -->
+    <div class="portfolio-dashboard">
+        <!-- Левая колонка с графиками -->
+        <div class="dashboard-column">
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h2>Динамика стоимости портфеля</h2>
+                    <div class="period-selector">
+                        <button data-period="7d" class="period-btn active">7Д</button>
+                        <button data-period="30d" class="period-btn">30Д</button>
+                        <button data-period="90d" class="period-btn">90Д</button>
+                        <button data-period="all" class="period-btn">Всё</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <canvas id="performanceChart"></canvas>
+                </div>
+            </div>
+
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h2>Состав портфеля</h2>
+                </div>
+                <div class="card-body composition-container">
+                    <div class="pie-chart-container">
+                        <canvas id="compositionChart"></canvas>
+                    </div>
+                    <div class="composition-legend" id="compositionLegend">
+                        <!-- Легенда будет добавлена через JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Правая колонка с активами и транзакциями -->
+        <div class="dashboard-column">
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h2>Активы ({{ assets|length }})</h2>
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table class="assets-table">
+                            <thead>
+                                <tr>
+                                    <th>Монета</th>
+                                    <th>Количество</th>
+                                    <th>Ср. цена</th>
+                                    <th>Тек. цена</th>
+                                    <th>Стоимость</th>
+                                    <th>Прибыль/Убыток</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for asset in assets %}
+                                <tr>
+                                    <td class="asset-name">
+                                        <strong>{{ asset.coin_symbol }}</strong><br>
+                                        <span class="asset-full-name">{{ asset.coin_name }}</span>
+                                    </td>
+                                    <td>{{ '%.8f'|format(asset.total_quantity) }}</td>
+                                    <td>${{ '%.4f'|format(asset.avg_buy_price) }}</td>
+                                    <td>${{ '%.4f'|format(asset.current_price) }}</td>
+                                    <td>${{ '%.2f'|format(asset.current_value) }}</td>
+                                    <td class="{% if asset.profit_loss > 0 %}profit{% elif asset.profit_loss < 0 %}loss{% endif %}">
+                                        {{ '+' if asset.profit_loss > 0 else '' }}${{ '%.2f'|format(asset.profit_loss) }}
+                                        <br>
+                                        <span class="percent">{{ '+' if asset.profit_loss_percent > 0 else '' }}{{ '%.2f'|format(asset.profit_loss_percent) }}%</span>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="empty-message">Нет активов в портфеле</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h2>История транзакций</h2>
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table class="transactions-table">
+                            <thead>
+                                <tr>
+                                    <th>Дата</th>
+                                    <th>Монета</th>
+                                    <th>Количество</th>
+                                    <th>Цена</th>
+                                    <th>Сумма</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tx in transaction_history %}
+                                <tr data-tx-id="{{ tx.id }}">
+                                    <td>{{ tx.purchase_date.strftime('%d.%m.%Y %H:%M') }}</td>
+                                    <td class="tx-coin">
+                                        <strong>{{ tx.coin_symbol }}</strong><br>
+                                        <span class="tx-coin-name">{{ tx.coin_name }}</span>
+                                    </td>
+                                    <td>{{ '%.8f'|format(tx.quantity) }}</td>
+                                    <td>${{ '%.4f'|format(tx.price_usd) }}</td>
+                                    <td>${{ '%.2f'|format(tx.total_amount) }}</td>
+                                    <td>
+                                        <button class="delete-tx-btn" data-tx-id="{{ tx.id }}">Удалить</button>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="empty-message">Нет транзакций в истории</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно подтверждения -->
+    <div id="confirmModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Подтверждение</h2>
+                <span class="modal-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p id="confirmMessage">Вы уверены, что хотите выполнить это действие?</p>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelBtn" class="cancel-btn">Отмена</button>
+                <button id="confirmBtn" class="confirm-btn">Подтвердить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Спиннер загрузки -->
+    <div id="spinnerOverlay" class="spinner-overlay">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Уведомление -->
+    <div id="notification" class="notification"></div>
+
+    <!-- Данные для JavaScript -->
+    <script>
+        // Передаем данные из шаблона в JavaScript
+        const PORTFOLIO_ID = {{ portfolio.id }};
+    </script>
+
+    <!-- Подключение JavaScript -->
+    <script src="{{ url_for('static', filename='portfolio-detail.js') }}"></script>
+</body>
+</html>
