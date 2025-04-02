@@ -2,6 +2,7 @@ import requests
 import os
 import mysql.connector
 import time
+import datetime  # Импортируем модуль datetime
 from dotenv import load_dotenv
 
 # Загрузка переменных окружения
@@ -19,6 +20,12 @@ DB_HOST = os.getenv('DB_HOST', 'localhost')
 DB_PORT = os.getenv('DB_PORT', '3306')
 DB_USER = os.getenv('DB_USER', '')
 DB_PASSWORD = os.getenv('DB_PASSWORD', '')
+
+
+def log_message(message):
+    """Выводит сообщение с временной меткой."""
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{timestamp} - {message}")
 
 
 def fetch_crypto_listings(start=1, limit=5000):
@@ -45,8 +52,8 @@ def fetch_crypto_listings(start=1, limit=5000):
     if response.status_code == 200:
         return response.json()
     else:
-        print(f"Ошибка: {response.status_code}")
-        print(response.text)
+        log_message(f"Ошибка: {response.status_code}")
+        log_message(response.text) # Используем log_message
         return None
 
 
@@ -59,20 +66,20 @@ def fetch_all_crypto_listings():
     limit = 5000  # Максимальное количество результатов на страницу
 
     while True:
-        print(f"Получение данных, начиная с позиции {start}...")
+        log_message(f"Получение данных, начиная с позиции {start}...") # Используем log_message
         response = fetch_crypto_listings(start, limit)
 
         if not response or 'data' not in response:
-            print("Не удалось получить данные или получены все доступные данные.")
+            log_message("Не удалось получить данные или получены все доступные данные.") # Используем log_message
             break
 
         data = response['data']
         if not data:
-            print("Все данные получены.")
+            log_message("Все данные получены.") # Используем log_message
             break
 
         all_data.extend(data)
-        print(f"Получено {len(data)} листингов. Всего: {len(all_data)}")
+        log_message(f"Получено {len(data)} листингов. Всего: {len(all_data)}") # Используем log_message
 
         # Если получено меньше записей, чем запрошено, значит это последняя страница
         if len(data) < limit:
@@ -99,10 +106,10 @@ def create_database_connection():
             database=DB_NAME,
             port=int(DB_PORT)
         )
-        print("Подключение к базе данных успешно установлено")
+        log_message("Подключение к базе данных успешно установлено") # Используем log_message
         return conn
     except mysql.connector.Error as err:
-        print(f"Ошибка подключения к базе данных: {err}")
+        log_message(f"Ошибка подключения к базе данных: {err}") # Используем log_message
         raise
 
 
@@ -111,8 +118,6 @@ def create_crypto_listings_table(conn):
     Создание таблицы для данных о листингах криптовалют в базе данных, если она не существует
     """
     cursor = conn.cursor()
-
-    # Создание таблицы cmc_crypto, если она не существует
 
     # Создание таблицы cmc_crypto, если она не существует
     cursor.execute('''
@@ -146,7 +151,7 @@ def create_crypto_listings_table(conn):
     ''')
 
     conn.commit()
-    print("Таблица cmc_crypto создана или уже существует")
+    log_message("Таблица cmc_crypto создана или уже существует") # Используем log_message
 
 
 def save_crypto_listings_to_db(listings, conn):
@@ -204,7 +209,7 @@ def save_crypto_listings_to_db(listings, conn):
     existing_ids = {row[0] for row in cursor.fetchall()}
 
     # Подготавливаем пакеты данных
-    print("Подготовка данных для пакетной обработки...")
+    log_message("Подготовка данных для пакетной обработки...") # Используем log_message
     all_values = []
 
     for crypto in listings:
@@ -243,7 +248,7 @@ def save_crypto_listings_to_db(listings, conn):
         all_values.append(values)
 
     # Обрабатываем данные пакетами
-    print(f"Начало пакетной обработки данных (размер пакета: {batch_size})...")
+    log_message(f"Начало пакетной обработки данных (размер пакета: {batch_size})...") # Используем log_message
 
     for i in range(0, len(all_values), batch_size):
         batch = all_values[i:i + batch_size]
@@ -251,7 +256,7 @@ def save_crypto_listings_to_db(listings, conn):
         conn.commit()
 
         total_processed += len(batch)
-        print(f"Обработано {total_processed} из {len(all_values)} криптовалют...")
+        log_message(f"Обработано {total_processed} из {len(all_values)} криптовалют...") # Используем log_message
 
     # Подсчитываем количество новых и обновленных записей
     cursor.execute("SELECT id FROM cmc_crypto")
@@ -260,27 +265,27 @@ def save_crypto_listings_to_db(listings, conn):
     inserted_count = len(current_ids - existing_ids)
     updated_count = len(all_values) - inserted_count
 
-    print(
+    log_message( # Используем log_message
         f"Добавлено {inserted_count} новых криптовалют и обновлено {updated_count} существующих криптовалют в базе данных")
 
 
 def main():
     try:
-        import time
+        # import time # time уже импортирован глобально
         start_time = time.time()
 
         # Получение данных о листингах криптовалют из API
-        print("Получение данных о листингах криптовалют из API CoinMarketCap...")
+        log_message("Получение данных о листингах криптовалют из API CoinMarketCap...") # Используем log_message
         listings = fetch_all_crypto_listings()
 
         api_time = time.time()
-        print(f"API запросы заняли {api_time - start_time:.2f} секунд")
+        log_message(f"API запросы заняли {api_time - start_time:.2f} секунд") # Используем log_message
 
         if not listings:
-            print("Не удалось получить данные о листингах криптовалют.")
+            log_message("Не удалось получить данные о листингах криптовалют.") # Используем log_message
             return
 
-        print(f"Успешно получено {len(listings)} листингов криптовалют")
+        log_message(f"Успешно получено {len(listings)} листингов криптовалют") # Используем log_message
 
         # Создание подключения к базе данных
         conn = create_database_connection()
@@ -292,18 +297,18 @@ def main():
         save_crypto_listings_to_db(listings, conn)
 
         db_time = time.time()
-        print(f"Сохранение в базу данных заняло {db_time - api_time:.2f} секунд")
+        log_message(f"Сохранение в базу данных заняло {db_time - api_time:.2f} секунд") # Используем log_message
 
         # Закрытие соединения с базой данных
         conn.close()
-        print("Соединение с базой данных закрыто")
+        log_message("Соединение с базой данных закрыто") # Используем log_message
 
         total_time = time.time() - start_time
-        print(f"Общее время выполнения: {total_time:.2f} секунд")
-        print("Процесс успешно завершен.")
+        log_message(f"Общее время выполнения: {total_time:.2f} секунд") # Используем log_message
+        log_message("Процесс успешно завершен.") # Используем log_message
 
     except Exception as e:
-        print(f"Произошла ошибка: {str(e)}")
+        log_message(f"Произошла ошибка: {str(e)}") # Используем log_message
 
 
 if __name__ == "__main__":
