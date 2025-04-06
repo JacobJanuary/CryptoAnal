@@ -1,3 +1,4 @@
+#cron раз в неделю
 import requests
 import os
 import time

@@ -1,3 +1,4 @@
+#старыц код. переделать мониторинг для телеги
 import os
 import requests
 import mysql.connector

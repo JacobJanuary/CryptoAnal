@@ -1,3 +1,4 @@
+#сделать Cron и обновлять раз в неделю
 import requests
 import os
 import mysql.connector
@@ -99,7 +100,7 @@ def create_relations_table(conn):
 
 def save_category_coins_relations(conn, category_id, coins):
     """
-    Сохранение связей категорий и монет в базу данных
+    Сохранение связей категорий и монет в базу данных с проверкой существования
     """
     if not coins:
         print(f"Нет монет для категории {category_id}")
@@ -107,18 +108,36 @@ def save_category_coins_relations(conn, category_id, coins):
 
     cursor = conn.cursor()
 
-    # Подготавливаем SQL запрос для вставки новых связей
-    insert_sql = '''
-    INSERT IGNORE INTO cmc_category_relations (category_id, coin_id)
-    VALUES (%s, %s)
-    '''
+    # Для отслеживания статистики
+    new_relations = 0
+    existing_relations = 0
 
-    values = [(category_id, coin['id']) for coin in coins]
+    for coin in coins:
+        # Проверяем существует ли уже такая связь
+        check_sql = '''
+        SELECT COUNT(*) FROM cmc_category_relations 
+        WHERE category_id = %s AND coin_id = %s
+        '''
+        cursor.execute(check_sql, (category_id, coin['id']))
+        count = cursor.fetchone()[0]
 
-    cursor.executemany(insert_sql, values)
+        # Если связь не существует, добавляем ее
+        if count == 0:
+            insert_sql = '''
+            INSERT INTO cmc_category_relations (category_id, coin_id)
+            VALUES (%s, %s)
+            '''
+            cursor.execute(insert_sql, (category_id, coin['id']))
+            new_relations += 1
+        else:
+            existing_relations += 1
+
     conn.commit()
 
-    print(f"Сохранено {cursor.rowcount} связей для категории {category_id}")
+    print(
+        f"Категория {category_id}: добавлено {new_relations} новых связей, пропущено {existing_relations} существующих связей")
+
+    return new_relations
 
 
 def process_all_categories():
