@@ -62,7 +62,7 @@ def fetch_top_cryptocurrencies(conn):
     cursor = conn.cursor(dictionary=True)
 
     # Получаем список id категорий с isTop=1
-    cursor.execute("SELECT id FROM categories WHERE name = 'Made in America'")
+    cursor.execute("SELECT id FROM cmc_favorites UNION SELECT id FROM categories WHERE isTop = 1")
     category_ids = [row['id'] for row in cursor.fetchall()]
 
     if not category_ids:
@@ -73,11 +73,12 @@ def fetch_top_cryptocurrencies(conn):
     # у которых еще нет информации об инвестициях
     placeholders = ','.join(['%s'] * len(category_ids))
     query = f"""
-    SELECT DISTINCT c.id, c.name, c.symbol, c.cmc_rank
+    SELECT DISTINCT c.id, c.name, c.symbol, c.cmc_rank, c.volume_24h, c.market_cap
     FROM cmc_crypto c
     JOIN cmc_category_relations r ON c.id = r.coin_id
     WHERE r.category_id IN ({placeholders})
     AND (c.gemini_invest IS NULL OR c.gemini_invest = '')
+    AND c.market_cap>=500000 AND c.volume_24h>=500000
     ORDER BY c.cmc_rank
     """
 
@@ -97,39 +98,58 @@ def query_gemini_for_crypto(crypto_name, crypto_symbol):
         client = genai.Client(api_key=GEMINI_API_KEY)
 
         # Формируем промт, заменяя Sui на имя запрашиваемой криптовалюты
-        prompt_text = f"""Проведи детальный анализ криптовалюты {crypto_name}
-Мне нужен глубокий анализ проекта с использованием всех возможностей искусственного интеллекта.
-Что делает, какую проблему решает проект. Стадия готовности, кем используется и где.
-Исследуй интерес крупного капитала (так называемые whale transactions):
-- Каков интерес крупных держателей к проекту?
-- Какой процент эмиссии держат киты?
-- Наблюдалась ли тенденция к накоплению или продаже токенов китами в течение последнего года?
-Проанализируй интерес и вложения в проект со стороны так называемых \"умных денег\" (Smart money):
-- Какие фонды вложились в проект?
-- Каковы суммы инвестиций фондов?
-- По какой цене фонды приобретали токены?
-- Разблокированы ли уже токены, принадлежащие фондам?
-- Успели ли фонды продать свои токены и получить прибыль, превышающую 20-кратный размер их первоначальных инвестиций?
-Изучи торговлю проектом на централизованных биржах:
-- На каких централизованных биржах торгуется {crypto_name}?
-- Каковы текущие объемы торгов?
-- Наблюдались ли ощутимые всплески объема торгов? Если да, то как ты можешь это охарактеризовать?
-Оцени мнение лидеров индустрии и лидеров мнений о проекте {crypto_name}.
-Выясни дату выхода проекта:
-- Когда был выпущен токен {crypto_name}?
-- Когда состоялся листинг на биржах?
-- Произошло ли это во время бычьего рынка 2021 года или позже/раньше?
-- Какова была максимальная рыночная капитализация проекта?
-Оцени текущую актуальность проекта:
-- В тренде ли сейчас то, чем занимается проект?
-- Насколько сильна команда проекта?
-- К какой стране относится проект? Зарегистрирован ли он в США?
-Проанализируй активность команды разработчиков:
-- Какова активность команды в целом?
-- Какова активность в репозиториях GitHub и других платформах для разработчиков?
-Оцени перспективы проекта:
-- Каковы общие перспективы развития проекта {crypto_name}?
-- Сделай прогноз цены токена на ближайший альтсезон."""
+        prompt_text = f"""
+        Conduct a comprehensive and detailed analysis of the cryptocurrency project {crypto_name}, utilizing all available tools of artificial intelligence and data analytics. **Important:** The answer must be provided in **Russian language**.
+
+        **1. Project Overview and Mission:**  
+        - What is the core idea and main objectives of the {crypto_name} project?  
+        - Which real-world problem does the project aim to solve, and how relevant is it for the market?
+        - What is the current stage of product development (MVP, beta, mainnet, etc.)?
+        - Who are the primary users: B2C, B2B, or developers?
+
+        **2. Large Holders (Whales) Analysis:**  
+        - Are there any notable large addresses (whales) involved in {crypto_name}?  
+        - What percentage of token supply do whales hold?  
+        - Has there been a trend of accumulation or distribution by whales in the past year?
+
+        **3. Smart Money Involvement:**  
+        - Which venture capital funds or institutional investors have invested in the project?
+        - What are the volumes and dates of their investments?
+        - Is the purchase price of tokens by these funds known?
+        - Have their tokens already been unlocked?
+        - Have any funds realized an exceptionally high profit (20x+)? What does this indicate about the project's potential and risks?
+
+        **4. Centralized Exchange (CEX) Market Data:**  
+        - On which centralized exchanges is {crypto_name} traded?
+        - What are the current and average daily trading volumes?
+        - Have there been noticeable spikes or anomalies in trading volume? Were these due to internal events or external news?
+
+        **5. Industry and Opinion Leaders:**  
+        - What do industry leaders, influencers, and credible analysts say about the project?
+        - Are there public endorsements or partnerships with prominent market players?
+
+        **6. Token and Market Cap History:**  
+        - When was the token launched and first listed on an exchange?
+        - What was the market phase at the time (bull, bear, sideways—2021 or another period)?
+        - What is the all-time highest market capitalization for {crypto_name}?
+
+        **7. Current Relevance of the Project:**  
+        - Is the project in line with current industry trends?
+        - How strong and competent is the team (backgrounds, public profiles, reputation)?
+        - What is the country of origin? Is it registered in the USA or in any key jurisdictions?
+
+        **8. Development Activity:**  
+        - What is the current activity level of the team and community? Are there frequent updates to GitHub or other repositories?
+        - Does the team respond quickly to issues or bugs?
+
+        **9. Future Prospects and Forecast:**  
+        - What are the short- and long-term perspectives and potential risks for the project?
+        - Provide a well-argued forecast of {crypto_name} token price for the next altseason.
+
+        Please use both factual data and analytical insights, paying close attention to any factors that may significantly influence investment decisions.
+
+        **Once again: The answer should be written entirely in Russian.**
+        """
 
         # Настраиваем конфигурацию для генерации с использованием Google Search
         response = client.models.generate_content(
