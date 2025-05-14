@@ -1,7 +1,9 @@
 import os
+import json
 import mysql.connector
 from dotenv import load_dotenv
 from openai import OpenAI
+from datetime import datetime
 
 # Загрузка переменных окружения из файла .env
 load_dotenv()
@@ -44,19 +46,47 @@ SYSTEM_PROMPT = """
 Твоя текущая задача — анализировать твиты крипто-инфлюенсеров на английском языке и предоставлять структурированную информацию на русском языке, которая будет использоваться для принятия инвестиционных решений.
 
 # Цель
-Анализировать англоязычные твиты о криптовалютах и предоставлять структурированную информацию на русском языке в формате JSON.
+Анализировать массив англоязычных твитов о криптовалютах и предоставлять структурированную информацию на русском языке в формате JSON.
 
 # Ожидаемый результат
-JSON-объект с полями:
+Массив JSON-объектов, где каждый объект соответствует одному твиту и содержит поля:
 - "type": категория твита
 - "title": краткий заголовок на русском (3-5 слов)
 - "description": краткое описание на русском (2-3 предложения)
 
-# Алгоритм анализа
+# Формат входных данных
+Два массива JSON-объектов:
+1. Первый массив - новые необработанные твиты:
+```json
+[
+  {
+    "text": "текст_твита1"
+  },
+  {
+    "text": "текст_твита2"
+  },
+  ...
+]
+```
+
+2. Второй массив - ранее обработанные твиты:
+```json
+[
+  {
+    "text": "текст_ранее_обработанного_твита1"
+  },
+  {
+    "text": "текст_ранее_обработанного_твита2"
+  },
+  ...
+]
+```
+
+# Алгоритм анализа для каждого твита из первого массива
 
 ## ШАГ 0: Проверка на дублирование информации
-- Проверь, был ли в текущем диалоге уже подобный твит, описывающий то же самое событие
-- Если текущий твит описывает то же событие, что и один из предыдущих твитов (например, уже был твит "XRP обогнал USDT по капитализации", а новый твит - "XRP теперь #3 по рыночной капитализации"), классифицируй его как "alreadyPosted"
+- Проверь, описывает ли текущий твит то же событие, что и один из предыдущих твитов в первом массиве ИЛИ любой твит из второго массива (ранее обработанные)
+- Если текущий твит описывает то же событие, что и один из ранее обработанных твитов (например, уже был твит "XRP обогнал USDT по капитализации", а новый твит - "XRP теперь #3 по рыночной капитализации"), классифицируй его как "alreadyPosted"
 - В случае обнаружения дубликата, не анализируй его содержание дальше и верни:
 
 ```json
@@ -200,13 +230,15 @@ JSON-объект с полями:
 
 Результат:
 ```json
+{
   "type": "inside",
-  "title": "Альткоины достигли первого "Золотого креста" за 4 года!",
-  "description": "Золотой крест — технический индикатор, сигнализирующий о возможном бычьем тренде. В прошлый раз это привело к росту рынка в 150 раз за несколько недель,  начало нового бычьего ралли в мае 2025 года. Ниже список альткоинов, которые, могут принести значительную прибыль.."
+  "title": "Альткоины достигли первого 'Золотого креста' за 4 года!",
+  "description": "Золотой крест — технический индикатор, сигнализирующий о возможном бычьем тренде. В прошлый раз это привело к росту рынка в 150 раз за несколько недель, начало нового бычьего ралли в мае 2025 года. Ниже список альткоинов, которые могут принести значительную прибыль."
+}
 ```
 
 ## Пример 10: Проверка на дублирование
-Если в предыдущем диалоге уже был проанализирован твит "XRP обогнал USDT по капитализации", а новый твит гласит "XRP теперь #3 по рыночной капитализации", то:
+Если в первом или втором массиве уже был проанализирован твит "XRP обогнал USDT по капитализации", а новый твит гласит "XRP теперь #3 по рыночной капитализации", то:
 
 ```json
 {
@@ -216,8 +248,7 @@ JSON-объект с полями:
 }
 ```
 
-Всегда отвечай только в формате JSON без дополнительных комментариев.
-```
+Проанализируй каждый твит из первого массива (новые твиты) и верни результат в виде массива JSON-объектов, где каждый объект соответствует анализу одного твита. Отвечай только в формате JSON без дополнительных комментариев.
 """
 
 # Системный промпт в формате словаря
@@ -225,7 +256,6 @@ system_prompt = {
     "role": "system",
     "content": SYSTEM_PROMPT
 }
-
 
 # Функция для отправки сообщения и получения ответа
 def send_message(messages, model="grok-3"):
@@ -240,74 +270,123 @@ def send_message(messages, model="grok-3"):
     except Exception as e:
         return f"Ошибка при обращении к API: {str(e)}"
 
-
 # Функция для получения твитов из базы данных
 def get_recent_tweets():
     try:
         connection = mysql.connector.connect(**db_config)
         cursor = connection.cursor()
-        query = "SELECT url, tweet_text FROM tweets WHERE created_at >= NOW() - INTERVAL 10 HOUR AND isGrok is NULL"
+        # Получаем твиты за последние 4 часа с isGrok IS NULL
+        query = "SELECT id, url, tweet_text FROM tweets WHERE created_at >= NOW() - INTERVAL 4 HOUR AND isGrok IS NULL"
         cursor.execute(query)
         tweets = cursor.fetchall()
+
+        # Проверяем, достаточно ли твитов
+        if len(tweets) < 30:
+            print("Менее 30 твитов за последние 4 часа.")
+            cursor.close()
+            connection.close()
+            return [], [], []
+
+        # Формируем JSON-объект из первых 30 твитов
+        tweet_data = []
+        tweet_info = []
+        for tweet_id, url, tweet_text in tweets[:30]:
+            tweet_data.append({"text": tweet_text})
+            tweet_info.append({"id": tweet_id, "url": url})
+
+        # Обновляем isGrok для обработанных твитов
+        update_query = "UPDATE tweets SET isGrok = TRUE WHERE id = %s"
+        for tweet in tweet_info:
+            cursor.execute(update_query, (tweet["id"],))
+
+        # Получаем ранее обработанные твиты из tweet_analysis
+        analysis_query = """
+        SELECT title, description 
+        FROM tweet_analysis 
+        WHERE type NOT IN ('alreadyPosted', 'isSpam', 'isFlood') 
+        AND created_at >= NOW() - INTERVAL 10 HOUR
+        """
+        cursor.execute(analysis_query)
+        analyzed_tweets = [
+            {"text": f"{row[0]} {row[1]}" if row[0] and row[1] else ""}
+            for row in cursor.fetchall()
+        ]
+        # Фильтруем пустые строки
+        analyzed_tweets = [t for t in analyzed_tweets if t["text"]]
+
+        connection.commit()
         cursor.close()
         connection.close()
-        return tweets
+        return tweet_data, tweet_info, analyzed_tweets
     except mysql.connector.Error as e:
         print(f"Ошибка подключения к базе данных: {str(e)}")
-        return []
+        return [], [], []
 
+# Функция для сохранения результатов анализа в базу данных
+def save_analysis_results(tweet_info, analysis_results):
+    try:
+        connection = mysql.connector.connect(**db_config)
+        cursor = connection.cursor()
+        insert_query = """
+        INSERT INTO tweet_analysis (url, type, title, description, created_at)
+        VALUES (%s, %s, %s, %s, %s)
+        """
+        current_time = datetime.now()
+        for tweet, analysis in zip(tweet_info, analysis_results):
+            cursor.execute(insert_query, (
+                tweet["url"],
+                analysis["type"],
+                analysis["title"],
+                analysis["description"],
+                current_time
+            ))
+        connection.commit()
+        cursor.close()
+        connection.close()
+    except mysql.connector.Error as e:
+        print(f"Ошибка сохранения результатов в базу данных: {str(e)}")
 
 # Основной цикл
 def main():
-    # Инициализация истории сообщений с системным промптом
-    conversation = [system_prompt]
-
-    print("Анализ твитов за последние 2 часа:")
-
     # Получение твитов из базы данных
-    tweets = get_recent_tweets()
+    new_tweets, tweet_info, analyzed_tweets = get_recent_tweets()
 
-    if not tweets:
-        print("Твиты за последние 4 часа не найдены.")
-    else:
-        for url, tweet_text in tweets:
-            print(f"\nТвит ({url}): {tweet_text}")
+    if not new_tweets:
+        print("Завершение работы: недостаточно новых твитов.")
+        return
 
-            # Добавление текста твита в историю
-            conversation.append({"role": "user", "content": tweet_text})
+    print(f"Найдено {len(new_tweets)} новых твитов за последние 4 часа и {len(analyzed_tweets)} ранее обработанных твитов. Начинается анализ...")
 
-            # Отправка запроса и получение ответа
-            response = send_message(conversation)
+    # Формируем JSON для отправки в Grok
+    tweets_json = json.dumps({"new_tweets": new_tweets, "analyzed_tweets": analyzed_tweets}, ensure_ascii=False)
 
-            # Вывод ответа
-            print(f"Grok 3: {response}")
+    # Инициализация истории сообщений с системным промптом
+    conversation = [system_prompt, {"role": "user", "content": tweets_json}]
 
-            # Добавление ответа Grok в историю
-            conversation.append({"role": "assistant", "content": response})
+    # Отправка запроса и получение ответа
+    response = send_message(conversation)
 
-    # Переход в интерактивный режим
-    print("\nПереход в интерактивный режим. Введите твит на английском языке для анализа или 'выход' для завершения.")
+    try:
+        # Проверяем, является ли ответ валидным JSON
+        response_json = json.loads(response)
+        if not isinstance(response_json, list):
+            print("Ошибка: Ответ Grok не является массивом JSON")
+            return
 
-    while True:
-        # Получение ввода пользователя
-        user_input = input("Твит: ")
+        # Выводим результат в консоль
+        print("\nРезультат анализа твитов:")
+        for tweet, analysis in zip(tweet_info, response_json):
+            print(f"\nURL: {tweet['url']}")
+            print(f"Тип: {analysis['type']}")
+            print(f"Заголовок: {analysis['title']}")
+            print(f"Описание: {analysis['description']}")
 
-        if user_input.lower() in ["выход", "exit"]:
-            print("Чат завершен.")
-            break
+        # Сохраняем результаты анализа в базу данных
+        save_analysis_results(tweet_info, response_json)
 
-        # Добавление сообщения пользователя в историю
-        conversation.append({"role": "user", "content": user_input})
-
-        # Отправка запроса и получение ответа
-        response = send_message(conversation)
-
-        # Вывод ответа
-        print(f"Grok 3: {response}")
-
-        # Добавление ответа Grok в историю
-        conversation.append({"role": "assistant", "content": response})
-
+    except json.JSONDecodeError:
+        print(f"Ошибка: Неверный формат ответа от Grok: {response}")
+        return
 
 if __name__ == "__main__":
     main()
