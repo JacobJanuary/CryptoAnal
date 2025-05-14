@@ -88,10 +88,12 @@
                         {% endif %}
                     </a>
                 </th>
+                <th>BullRun</th>
+                <th>Grade</th>
                 <th>
                     <a href="{{ url_for('favourites', sort_by='big_volume_rank', order=opposite_order if current_sort == 'big_volume_rank' else 'asc') }}"
                        class="{% if current_sort == 'big_volume_rank' %}active{% endif %}">
-                        BigVolumeRank
+                        BigDays
                         {% if current_sort == 'big_volume_rank' %}
                             <span class="sort-arrow">
                                     {% if current_order == 'asc' %}▲{% else %}▼{% endif %}
@@ -168,7 +170,7 @@
                 <th>
                     <a href="{{ url_for('favourites', sort_by='volume_24h', order=opposite_order if current_sort == 'volume_24h' else 'asc') }}"
                        class="{% if current_sort == 'volume_24h' %}active{% endif %}">
-                        24h Volume
+                        Vol24
                         {% if current_sort == 'volume_24h' %}
                             <span class="sort-arrow">
                                     {% if current_order == 'asc' %}▲{% else %}▼{% endif %}
@@ -176,6 +178,7 @@
                         {% endif %}
                     </a>
                 </th>
+                <th>V/MCap</th>
                 <th>Price</th>
                 <th>Category</th>
                 <th>Покупка</th>
@@ -200,6 +203,8 @@
                     data-category-ids="{{ coin.category_ids }}">
                     <td>{{ coin.name }} ({{ coin.symbol }})</td>
                     <td>{{ coin.market_cap_rank }}</td>
+                    <td>{{ coin.rull_run_x }}</td>
+                    <td>{{ coin.grade }}</td>
                     <td>{{ big_volume_percent }}%</td>
                     <td class="{% if coin.percent_change_1h > 0 %}positive-change{% elif coin.percent_change_1h < 0 %}negative-change{% endif %}">
                         {{ coin.percent_change_1h|safe_round(2) }}%
@@ -226,6 +231,14 @@
                             N/A
                         {% endif %}
                     </td>
+                    <td>
+                        {% if coin.market_cap and coin.market_cap != 0 %}
+                            {{ (coin.total_volume_usd/coin.market_cap*100)|round(2) }}%
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </td>
+
                     <td>${{ coin.current_price_usd|safe_round(4) }}</td>
                     <td>
                         {% if coin.main_category %}

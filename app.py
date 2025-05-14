@@ -440,6 +440,8 @@ def favourites():
                    c.volume_24h AS total_volume_usd,
                    c.high_volume_days,
                    c.total_days,
+                   c.rull_run_x, 
+                   c.grade,
                    (
                      SELECT cat.name
                      FROM cmc_category_relations ccr
@@ -515,9 +517,14 @@ def coin_details(coin_id):
                 c.id AS coin_id,
                 c.name,
                 c.symbol,
-                c.grok2_text AS AI_text,
-                c.grok2_invest AS AI_invest,
-                c.gemini_invest,
+                c.project_review, 
+                c.top5_good, 
+                c.top5_bad, 
+                c.social_metrics, 
+                c.bullrun_roi, 
+                c.project_final_recomend,
+                c.rull_run_x, 
+                c.grade,
                 c.market_cap,
                 c.cmc_rank AS market_cap_rank,
                 c.ath_usd, c.atl_usd,

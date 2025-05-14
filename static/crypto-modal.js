@@ -188,20 +188,48 @@ function showCoinDetails(coinId) {
                     </div>`;
             }
 
-            // Добавляем дополнительный анализ, если он доступен
-            if (data.gemini_invest) {
-                html += `
-                    <!-- Дополнительный анализ -->
-                    <div class="coin-section">
-                        <div class="section-header">
-                            <span style="margin-right: 10px;">📊</span>
-                            <h3>Additional Investment Analysis</h3>
-                        </div>
-                        <div class="section-content analytics-content">
-                            ${formatAnalyticsContent(data.gemini_invest)}
-                        </div>
-                    </div>`;
-            }
+            if ( data.project_review || data.top5_good || data.top5_bad ||
+    data.social_metrics || data.bullrun_roi || data.project_final_recomend) {
+    html += `
+        <!-- Дополнительный анализ -->
+        <div class="coin-section">
+            <div class="section-header">
+                <span style="margin-right: 10px;">📊</span>
+                <h3>Additional Investment Analysis</h3>
+            </div>
+            <div class="section-content analytics-content">`;
+
+    // Добавляем данные из всех полей, если они доступны
+
+    if (data.project_review) {
+        html += `<h4>Обзор проекта</h4>${formatAnalyticsContent(data.project_review)}`;
+    }
+
+    if (data.top5_good) {
+        html += `<h4>Топ-5 положительных факторов</h4>${formatAnalyticsContent(data.top5_good)}`;
+    }
+
+    if (data.top5_bad) {
+        html += `<h4>Топ-5 отрицательных факторов</h4>${formatAnalyticsContent(data.top5_bad)}`;
+    }
+
+    if (data.social_metrics) {
+        html += `<h4>Метрики социальной активности</h4>${formatAnalyticsContent(data.social_metrics)}`;
+    }
+
+    if (data.bullrun_roi) {
+        html += `<h4>ROI во время буллрана</h4>${formatAnalyticsContent(data.bullrun_roi)}`;
+    }
+
+    if (data.project_final_recomend) {
+        html += `<h4>Финальная рекомендация</h4>${formatAnalyticsContent(data.project_final_recomend)}`;
+    }
+
+    html += `
+            </div>
+        </div>`;
+}
+
 
             html += `</div>`; // Закрываем modal-body
 
