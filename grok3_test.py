@@ -257,6 +257,7 @@ system_prompt = {
     "content": SYSTEM_PROMPT
 }
 
+
 # Функция для отправки сообщения и получения ответа
 def send_message(messages, model="grok-3"):
     try:
@@ -268,17 +269,22 @@ def send_message(messages, model="grok-3"):
         )
         return response.choices[0].message.content
     except Exception as e:
-        return f"Ошибка при обращении к API: {str(e)}"
+        print(f"Ошибка при обращении к API: {str(e)}")
+        return None
+
 
 # Функция для получения твитов из базы данных
 def get_recent_tweets():
+    print("Запуск get_recent_tweets...")
     try:
         connection = mysql.connector.connect(**db_config)
         cursor = connection.cursor()
         # Получаем твиты за последние 4 часа с isGrok IS NULL
-        query = "SELECT id, url, tweet_text FROM tweets WHERE created_at >= NOW() - INTERVAL 4 HOUR AND isGrok IS NULL"
+        print("Выполняем запрос для новых твитов...")
+        query = "SELECT id, url, tweet_text FROM tweets WHERE created_at >= NOW() - INTERVAL 5 HOUR AND isGrok IS NULL"
         cursor.execute(query)
         tweets = cursor.fetchall()
+        print(f"Получено {len(tweets)} новых твитов")
 
         # Проверяем, достаточно ли твитов
         if len(tweets) < 30:
@@ -292,20 +298,23 @@ def get_recent_tweets():
         tweet_info = []
         for tweet_id, url, tweet_text in tweets[:30]:
             tweet_data.append({"text": tweet_text})
-            tweet_info.append({"id": tweet_id, "url": url})
+            tweet_info.append({"id": tweet_id, "url": url, "text": tweet_text})
+        print(f"Сформировано {len(tweet_data)} новых твитов для анализа")
 
         # Обновляем isGrok для обработанных твитов
         update_query = "UPDATE tweets SET isGrok = TRUE WHERE id = %s"
         for tweet in tweet_info:
             cursor.execute(update_query, (tweet["id"],))
+        print("Обновлены флаги isGrok для новых твитов")
 
         # Получаем ранее обработанные твиты из tweet_analysis
+        print("Выполняем запрос для ранее обработанных твитов...")
         analysis_query = """
-        SELECT title, description 
-        FROM tweet_analysis 
-        WHERE type NOT IN ('alreadyPosted', 'isSpam', 'isFlood') 
-        AND created_at >= NOW() - INTERVAL 10 HOUR
-        """
+                         SELECT title, description
+                         FROM tweet_analysis
+                         WHERE type NOT IN ('alreadyPosted', 'isSpam', 'isFlood')
+                           AND created_at >= NOW() - INTERVAL 10 HOUR \
+                         """
         cursor.execute(analysis_query)
         analyzed_tweets = [
             {"text": f"{row[0]} {row[1]}" if row[0] and row[1] else ""}
@@ -313,24 +322,28 @@ def get_recent_tweets():
         ]
         # Фильтруем пустые строки
         analyzed_tweets = [t for t in analyzed_tweets if t["text"]]
+        print(f"Получено {len(analyzed_tweets)} ранее обработанных твитов")
 
         connection.commit()
         cursor.close()
         connection.close()
+        print("get_recent_tweets завершена успешно")
         return tweet_data, tweet_info, analyzed_tweets
     except mysql.connector.Error as e:
         print(f"Ошибка подключения к базе данных: {str(e)}")
         return [], [], []
 
+
 # Функция для сохранения результатов анализа в базу данных
 def save_analysis_results(tweet_info, analysis_results):
+    print("Сохранение результатов анализа...")
     try:
         connection = mysql.connector.connect(**db_config)
         cursor = connection.cursor()
         insert_query = """
-        INSERT INTO tweet_analysis (url, type, title, description, created_at)
-        VALUES (%s, %s, %s, %s, %s)
-        """
+                       INSERT INTO tweet_analysis (url, type, title, description, created_at)
+                       VALUES (%s, %s, %s, %s, %s) \
+                       """
         current_time = datetime.now()
         for tweet, analysis in zip(tweet_info, analysis_results):
             cursor.execute(insert_query, (
@@ -343,43 +356,95 @@ def save_analysis_results(tweet_info, analysis_results):
         connection.commit()
         cursor.close()
         connection.close()
+        print("Результаты анализа успешно сохранены")
     except mysql.connector.Error as e:
         print(f"Ошибка сохранения результатов в базу данных: {str(e)}")
 
+
+# Функция для вывода отсортированных результатов по категориям в формате Telegram
+def print_sorted_analysis(tweet_info, analysis_results):
+    print("\nФорматированный вывод для Telegram:")
+
+    # Определяем категории, эмодзи и их соответствие типам
+    categories = [
+        ("📰 Новости", ["trueNews"]),
+        ("🗣️ Слухи", ["fakeNews"]),
+        ("🔍 Инсайд", ["inside"]),
+        ("📚 Учеба", ["tutorial"]),
+        ("📊 Аналитика и трейдинг", ["analitics", "trading"]),
+        ("🌐 Другое", ["others"])
+    ]
+
+    # Формируем сообщение в формате Markdown V2
+    output = ["*Криптоанализ твитов* 🌟\n"]
+
+    for category_name, category_types in categories:
+        # Фильтруем твиты, соответствующие текущей категории
+        relevant_tweets = [
+            (tweet, analysis) for tweet, analysis in zip(tweet_info, analysis_results)
+            if analysis["type"] in category_types and analysis["title"] and analysis["description"]
+        ]
+
+        if relevant_tweets:
+            output.append(f"*{category_name}*\n")
+            for tweet, analysis in relevant_tweets:
+                # Экранируем специальные символы для Markdown V2
+                title = analysis["title"].replace(".", "\\.").replace("-", "\\-").replace("!", "\\!").replace("(",
+                                                                                                              "\\(").replace(
+                    ")", "\\)")
+                description = analysis["description"].replace(".", "\\.").replace("-", "\\-").replace("!",
+                                                                                                      "\\!").replace(
+                    "(", "\\(").replace(")", "\\)")
+                url = tweet["url"].replace(".", "\\.").replace("-", "\\-").replace("!", "\\!").replace("(",
+                                                                                                       "\\(").replace(
+                    ")", "\\)")
+                output.append(f"*{title}*\n{description}\n[Источник]({url})\n")
+            output.append("\n")
+
+    # Объединяем строки и выводим
+    formatted_output = "".join(output)
+    print(formatted_output)
+
+
 # Основной цикл
 def main():
+    print("Запуск основного цикла...")
     # Получение твитов из базы данных
-    new_tweets, tweet_info, analyzed_tweets = get_recent_tweets()
+    result = get_recent_tweets()
+    print(f"get_recent_tweets вернул: {len(result)} значений")
+    new_tweets, tweet_info, analyzed_tweets = result
 
     if not new_tweets:
         print("Завершение работы: недостаточно новых твитов.")
         return
 
-    print(f"Найдено {len(new_tweets)} новых твитов за последние 4 часа и {len(analyzed_tweets)} ранее обработанных твитов. Начинается анализ...")
+    print(
+        f"Найдено {len(new_tweets)} новых твитов за последние 4 часа и {len(analyzed_tweets)} ранее обработанных твитов. Начинается анализ...")
 
     # Формируем JSON для отправки в Grok
     tweets_json = json.dumps({"new_tweets": new_tweets, "analyzed_tweets": analyzed_tweets}, ensure_ascii=False)
+    print("JSON для Grok сформирован")
 
     # Инициализация истории сообщений с системным промптом
     conversation = [system_prompt, {"role": "user", "content": tweets_json}]
 
     # Отправка запроса и получение ответа
+    print("Отправка запроса в Grok...")
     response = send_message(conversation)
+    if not response:
+        print("Не удалось получить ответ от Grok")
+        return
 
     try:
         # Проверяем, является ли ответ валидным JSON
+        print("Проверка ответа Grok на валидность JSON...")
         response_json = json.loads(response)
         if not isinstance(response_json, list):
             print("Ошибка: Ответ Grok не является массивом JSON")
             return
 
-        # Выводим результат в консоль
-        print("\nРезультат анализа твитов:")
-        for tweet, analysis in zip(tweet_info, response_json):
-            print(f"\nURL: {tweet['url']}")
-            print(f"Тип: {analysis['type']}")
-            print(f"Заголовок: {analysis['title']}")
-            print(f"Описание: {analysis['description']}")
+        # Выводим отсортированные результаты по категориям
+        print_sorted_analysis(tweet_info, response_json)
 
         # Сохраняем результаты анализа в базу данных
         save_analysis_results(tweet_info, response_json)
@@ -387,6 +452,7 @@ def main():
     except json.JSONDecodeError:
         print(f"Ошибка: Неверный формат ответа от Grok: {response}")
         return
+
 
 if __name__ == "__main__":
     main()
