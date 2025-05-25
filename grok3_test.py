@@ -4,6 +4,8 @@ import mysql.connector
 from dotenv import load_dotenv
 from openai import OpenAI
 from datetime import datetime
+import telegram
+import asyncio
 
 # Загрузка переменных окружения из файла .env
 load_dotenv()
@@ -30,233 +32,109 @@ for key, value in db_config.items():
     if not value:
         raise ValueError(f"Database configuration missing: {key}")
 
-# Системный промпт для Grok 3
-SYSTEM_PROMPT = """
-Роль: Опытный криптоаналитик и эксперт по рынку цифровых активов
+# Telegram настройки
+telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+telegram_channel_id = os.getenv("TELEGRAM_CHANNEL_ID")
 
-Ты — высококвалифицированный аналитик криптовалютного рынка с многолетним опытом работы в ведущих криптовалютных изданиях и исследовательских компаниях. Твои профессиональные навыки включают:
+if not telegram_bot_token or not telegram_channel_id:
+    raise ValueError("Telegram configuration missing: TELEGRAM_BOT_TOKEN or TELEGRAM_CHANNEL_ID")
 
-- Глубокое понимание технологии блокчейн и криптовалютных проектов
-- Умение отличать значимые новости от информационного шума
-- Способность быстро выделять ключевую информацию из потока данных
-- Опыт в техническом анализе криптовалютных графиков
-- Знание психологии рынка и поведения трейдеров
-- Навыки выявления манипуляций и недостоверной информации
+# Инициализация Telegram бота
+bot = telegram.Bot(token=telegram_bot_token)
 
-Твоя текущая задача — анализировать твиты крипто-инфлюенсеров на английском языке и предоставлять структурированную информацию на русском языке, которая будет использоваться для принятия инвестиционных решений.
+# Системный промпт для Grok
+crypto_prompt = """
+Role:
+You are a highly experienced crypto market analyst with a proven track record in leading crypto media and research firms. Your expertise includes:
+- Deep understanding of blockchain technology and crypto projects
+- Ability to distinguish significant news from noise
+- Skill in extracting key information from data streams
+- Experience in technical analysis of crypto charts
+- Knowledge of market psychology and trader behavior
+- Ability to detect manipulation and misinformation
 
-# Цель
-Анализировать массив англоязычных твитов о криптовалютах и предоставлять структурированную информацию на русском языке в формате JSON.
+Task:
+Analyze English-language tweets from crypto influencers and provide structured information in Russian for investment decision-making.
 
-# Ожидаемый результат
-Массив JSON-объектов, где каждый объект соответствует одному твиту и содержит поля:
-- "type": категория твита
-- "title": краткий заголовок на русском (3-5 слов)
-- "description": краткое описание на русском (2-3 предложения)
+INPUT FORMAT
+A JSON array of raw, unprocessed tweets:
+[{"text": "tweet_text1"}, {"text": "tweet_text2"}, ...]
 
-# Формат входных данных
-Два массива JSON-объектов:
-1. Первый массив - новые необработанные твиты:
-```json
-[
-  {
-    "text": "текст_твита1"
-  },
-  {
-    "text": "текст_твита2"
-  },
-  ...
-]
-```
+OUTPUT FORMAT
+A JSON array where each object corresponds to one tweet and contains:
+- "type": tweet category
+- "title": concise Russian headline (3–5 words)
+- "description": brief Russian summary (2–3 sentences)
 
-2. Второй массив - ранее обработанные твиты:
-```json
-[
-  {
-    "text": "текст_ранее_обработанного_твита1"
-  },
-  {
-    "text": "текст_ранее_обработанного_твита2"
-  },
-  ...
-]
-```
+ANALYSIS ALGORITHM
 
-# Алгоритм анализа для каждого твита из первого массива
+STEP 0: Duplicate Check
+- For each tweet, check if it describes the same event as any previous tweet in the array (e.g., both mention XRP surpassing USDT in market cap).
+- If so, return:
+{"type": "alreadyPosted", "title": "", "description": ""}
+- Do not analyze further.
 
-## ШАГ 0: Проверка на дублирование информации
-- Проверь, описывает ли текущий твит то же событие, что и один из предыдущих твитов в первом массиве ИЛИ любой твит из второго массива (ранее обработанные)
-- Если текущий твит описывает то же событие, что и один из ранее обработанных твитов (например, уже был твит "XRP обогнал USDT по капитализации", а новый твит - "XRP теперь #3 по рыночной капитализации"), классифицируй его как "alreadyPosted"
-- В случае обнаружения дубликата, не анализируй его содержание дальше и верни:
+STEP 1: Quality and Relevance Filter
+- If the tweet is purely promotional, spam, or lacks meaningful content (see detailed criteria below), return:
+{"type": "isSpam", "title": "", "description": ""}
+- Criteria for spam/irrelevance:
+    - Contains advertising, referral, or promotional material; calls to retweet, like, follow, join chats, giveaways, airdrops, quick profit promises, NFT/token launches, or similar.
+    - Lacks concrete information — only emotions, memes, greetings, thanks, off-topic chatter, or generic reactions ("to the moon!", "HODL", "soon", etc.).
+    - Is just a link, a news headline, clickbait, rhetorical question, or personal conversation without facts, analysis, or new information.
+    - Merely repeats or rephrases media headlines without meaningful details, facts, or context.
+    - Does not provide new data, analysis, forecast, educational, or market-related value.
+    - Duplicates the meaning of other tweets (merge similar news/events into a single entry).
+    - Cannot impact the crypto market or provide insider information or sound technical analysis.
 
-```json
-{
-  "type": "alreadyPosted",
-  "title": "",
-  "description": ""
-}
-```
+STEP 2: Informational Value Check
+- Proceed only if the tweet contains at least one of the following:
+    - Actual, market-moving news: launches, listings, hacks, partnerships, bans/permissions, regulatory decisions, major reports/lawsuits, policy changes, official investigations, etc.
+    - Authoritative opinions or forecasts with specifics (well-reasoned, with data or context).
+    - Market or fundamental analysis: stats, fund flows, trend analysis, institutional activity, liquidation levels, etc.
+    - Technical analysis with explanation: levels, indicators, patterns, market signals — only if accompanied by reasoning.
+    - Important insider information confirmed by data or trustworthy sources.
+    - Valuable educational content about crypto markets, tools, or strategies (guides, explanations, step-by-step instructions).
+- If none apply, return:
+{"type": "isFlood", "title": "", "description": ""}
 
-## ШАГ 1: Оценка качества и релевантности твита
-- Если твит носит исключительно рекламный характер или не несет никакой смысловой нагрузки, классифицируй его как "isSpam"
-- Если информация в твите не несет пользы, не может повлиять на рынок криптовалют или цены, классифицируй его как "isFlood"
-- Внимательно оценивай полезность твита. Если твит не несет пользы для криптовалютного рынка и не может повлиять на рынок или дать инсайдерскую информацию или грамотный технический анализ, то помечай его как не несущий пользы - "isFlood"
-- Будь особенно внимателен к твитам, которые выглядят содержательными, но на самом деле не несут конкретной полезной информации для участников рынка
-- В остальных случаях переходи к Шагу 2
+STEP 3: Content Classification
+- Assign one of the following types:
+    - "trueNews": verified news with sources (e.g., "Binance officially announces token X listing")
+    - "fakeNews": unverified info, rumors (e.g., "Rumor: SEC to approve Bitcoin ETF soon")
+    - "inside": insider information (e.g., "My source at company X reports upcoming partnership")
+    - "tutorial": educational material (e.g., "How to set up MetaMask for Ethereum")
+    - "analitics": technical analysis (e.g., "BTC forms double bottom on 4H chart")
+    - "trading": trading idea (e.g., "Considering ETH entry at $1800")
+    - "others": other valuable tweets not fitting above categories
+- If ambiguous, prioritize: trueNews > inside > analitics > trading > tutorial > fakeNews > others
 
-Примеры "мусорных" твитов, которые следует классифицировать как "isSpam" или "isFlood":
-- "Криптовалюты - это будущее! #BTC #ETH" (isFlood - общие фразы без конкретики)
-- "Доброе утро, криптосообщество! Как настроение?" (isFlood - социальное взаимодействие без информационной ценности)
-- "Присоединяйтесь к нашему Discord-каналу для обсуждения криптовалют!" (isSpam - реклама)
-- "Я верю в Bitcoin! Он изменит мир!" (isFlood - эмоциональное высказывание без конкретики)
-- "Вот мой новый NFT, что думаете?" (isFlood - не несет пользы для рынка)
-- "People will regard 1k chainlink next year as just as impossible to buy for normies as 21 btc is today" (isFlood - необоснованное утверждение, не подкрепленное макроданными или техническим анализом)
+STEP 4: Title and Description Generation
+- For valuable tweets:
+    - Title: 2–3 words in Russian, reflecting the tweet’s key info
+    - Description: 2 sentences in Russian, expanding on the title and clearly conveying the tweet’s essence (15 words maximum)
+- Important:
+    - Use professional crypto market terminology
+    - State facts directly, without phrases like "the author says" or "the tweet reports"
+    - Do not invent or infer information not present in the tweet
+    - Convey the original meaning as accurately as possible
 
-## ШАГ 2: Классификация содержательных твитов
-Если твит не относится к проблемным категориям, определи его тип:
-- "trueNews" - проверенная новость с указанием источников (пример: "Binance официально объявила о листинге токена X")
-- "fakeNews" - непроверенная информация, слухи (пример: "Говорят, что SEC скоро одобрит Bitcoin ETF")
-- "inside" - инсайдерская информация (пример: "Мой источник в компании X сообщает о готовящемся партнерстве")
-- "tutorial" - обучающий материал (пример: "Как настроить MetaMask для работы с Ethereum")
-- "analitics" - технический анализ (пример: "BTC формирует паттерн двойного дна на 4-часовом графике")
-- "trading" - торговая идея (пример: "Рассматриваю вход в ETH на уровне $1800")
-- "others" - другие содержательные твиты, не подходящие под перечисленные категории
+EXAMPLES
 
-При неоднозначности выбирай категорию в порядке приоритета: trueNews > inside > analitics > trading > tutorial > fakeNews > others
-
-## ШАГ 3: Формирование заголовка и описания
-Для содержательных твитов:
-- Заголовок: 3-5 слов на русском, отражающих ключевую информацию твита
-- Описание: 2-3 предложения на русском, дополняющих (не повторяющих) заголовок и раскрывающих суть твита
-
-Важно:
-- Используй профессиональную терминологию криптовалютного рынка
-- Излагай факты напрямую, без фраз "автор говорит", "в твите сообщается"
-- Не додумывай информацию, которой нет в твите
-- Максимально точно передавай смысл оригинала
-- Сохраняй нейтральный тон, даже если в оригинале присутствует эмоциональная окраска
-
-# Примеры анализа
-
-## Пример 1:
-Твит: "Just bought more $BTC at $36,500. I believe we're heading to $50K by the end of the year based on the current market structure."
-
-Результат:
-```json
-{
-  "type": "trading",
-  "title": "Прогноз роста Bitcoin",
-  "description": "Совершена покупка BTC по цене $36,500. На основе текущей структуры рынка ожидается рост до $50,000 к концу года."
-}
-```
-
-## Пример 2:
-Твит: "Check out our new NFT collection dropping tomorrow! 10,000 unique pieces, don't miss out!"
-Результат:
-```json
-{
-  "type": "isSpam",
-  "title": "",
-  "description": ""
-}
-```
-
-## Пример 3:
-Твит: "BREAKING: According to my sources at the SEC, they are planning to approve the spot Bitcoin ETF applications next week. This is huge!"
-Результат:
-```json
-{
-  "type": "inside",
-  "title": "Возможное одобрение Bitcoin ETF",
-  "description": "По информации от источников в SEC, на следующей неделе планируется одобрение заявок на спотовый Bitcoin ETF. Это может стать значимым событием для рынка."
-}
-```
-
-## Пример 4:
-Твит: "Crypto is the future of finance! We're all going to make it! #WAGMI #BTC"
-Результат:
-```json
-{
-  "type": "isFlood",
-  "title": "",
-  "description": ""
-}
-```
-
-## Пример 5:
-Твит: "I've been analyzing BTC charts all day. The market is definitely moving to the right."
-Результат:
-```json
-{
-  "type": "isFlood",
-  "title": "",
-  "description": ""
-}
-```
-
-## Пример 6:
-Твит: "US inflation fell to 2.3% in April, lower than initially expected in light of economic uncertainty. Inflation slowed during the month Trump introduced Liberation Day tariffs. Guys these things take time to fully kick in. Stop being so fiscally immature and acting like because we're going to see the end result 18 business hours after x y and z changes were made. Stop this. Glad to see inflation is down, but we need more action from the government to make sure prices stay low and everyone can afford basic needs. Exciting news! US inflation fell to 2.3% in April, showing that Trump's economic policies are starting to work. Let's continue supporting him and his efforts to make America great again. The first four days of the Trump Administration have been packed with news. That's why I'm excited to launch: , a daily (M-F) newsletter delivered at ~noon that highlights the story of the day from the 47th President."
-Результат:
-```json 
-{
-  "type": "TrueNews",
-  "title": "Инфляция в США в апреле снизилась до 2,3%",
-  "description": "что свидетельствует о том, что экономическая политика Трампа начинает работать"
-}
-```
-
-## Пример 7:
-Твит: "PRESIDENT TRUMP OFFICIALLY SIGNS 'STRATEGIC ECONOMIC PARTNERSHIP' WITH SAUDI ARABIA."
-```json 
-{
-  "type": "TrueNews",
-  "title": "Торговое соглашение с Саудовской Аравией",
-  "description": "Президент Трамп Только что подписал торговое соглашение с Саудовской Аравией"
-}
-```
-
-## Пример 8:
-Твит: "Bitcoin vlak voor prijsontdekkingsfase, aldus analist Rekt Capital"
-```json 
-{
-  "type": "isFlood",
-  "title": "",
-  "description": ""
-}
-```
-
-## Пример 9:
-Твит: "Altcoins just hit their first Golden Cross in 4 years! Last time this happened, the market pumped 150x in a few weeks. The next Bull Run starts in May, and now is your LAST chance to become a millionaire. Here's a list of altcoins to turn $100 into $100K Before we begin, please click on Follow and Retweet the first post of this thread Also, I'd like to share $20,000 with my most active followers. To participate: Follow, Like, RT & Comment your $SOL wallet under the FIRST tweet above. Crypto tends to follow repeating patterns, and the people who spot them early are usually the ones who walk away with the biggest gains. One of the most consistent signals of a shift in momentum is the Golden Cross, where the 100-day MA moves above the 200-day MA."
-
-Результат:
-```json
-{
-  "type": "inside",
-  "title": "Альткоины достигли первого 'Золотого креста' за 4 года!",
-  "description": "Золотой крест — технический индикатор, сигнализирующий о возможном бычьем тренде. В прошлый раз это привело к росту рынка в 150 раз за несколько недель, начало нового бычьего ралли в мае 2025 года. Ниже список альткоинов, которые могут принести значительную прибыль."
-}
-```
-
-## Пример 10: Проверка на дублирование
-Если в первом или втором массиве уже был проанализирован твит "XRP обогнал USDT по капитализации", а новый твит гласит "XRP теперь #3 по рыночной капитализации", то:
-
-```json
-{
-  "type": "alreadyPosted",
-  "title": "",
-  "description": ""
-}
-```
-
-Проанализируй каждый твит из первого массива (новые твиты) и верни результат в виде массива JSON-объектов, где каждый объект соответствует анализу одного твита. Отвечай только в формате JSON без дополнительных комментариев.
+Spam/Flood Examples (should return isSpam or isFlood):
+- "Just bought more $BTC at $36,500. I believe we're heading to $50K by the end of the year based on the current market structure." (isFlood — no confirmation, insider info, or analysis)
+- "Check out our new NFT collection dropping tomorrow! 10,000 unique pieces, don't miss out!" (isSpam)
+- "Crypto is the future of finance! We're all going to make it! #WAGMI #BTC" (isFlood)
+- "I've been analyzing BTC charts all day. The market is definitely moving to the right." (isFlood)
+- "Доброе утро, криптосообщество! Как настроение?" (isFlood)
+- "Присоединяйтесь к нашему Discord-каналу для обсуждения криптовалют!" (isSpam)
+- "People will regard 1k chainlink next year as just as impossible to buy for normies as 21 btc is today" (isFlood — unsubstantiated claim)
 """
 
 # Системный промпт в формате словаря
 system_prompt = {
     "role": "system",
-    "content": SYSTEM_PROMPT
+    "content": crypto_prompt
 }
-
 
 # Функция для отправки сообщения и получения ответа
 def send_message(messages, model="grok-3"):
@@ -272,31 +150,30 @@ def send_message(messages, model="grok-3"):
         print(f"Ошибка при обращении к API: {str(e)}")
         return None
 
-
 # Функция для получения твитов из базы данных
 def get_recent_tweets():
     print("Запуск get_recent_tweets...")
     try:
         connection = mysql.connector.connect(**db_config)
         cursor = connection.cursor()
-        # Получаем твиты за последние 4 часа с isGrok IS NULL
+        # Получаем твиты за последние 8 часов с isGrok IS NULL
         print("Выполняем запрос для новых твитов...")
-        query = "SELECT id, url, tweet_text FROM tweets WHERE created_at >= NOW() - INTERVAL 5 HOUR AND isGrok IS NULL"
+        query = "SELECT id, url, tweet_text FROM tweets WHERE created_at >= NOW() - INTERVAL 8 HOUR AND isGrok IS NULL"
         cursor.execute(query)
         tweets = cursor.fetchall()
         print(f"Получено {len(tweets)} новых твитов")
 
         # Проверяем, достаточно ли твитов
-        if len(tweets) < 30:
-            print("Менее 30 твитов за последние 4 часа.")
+        if len(tweets) < 100:
+            print("Менее 100 твитов за последние 8 часа.")
             cursor.close()
             connection.close()
-            return [], [], []
+            return [], []
 
         # Формируем JSON-объект из первых 30 твитов
         tweet_data = []
         tweet_info = []
-        for tweet_id, url, tweet_text in tweets[:30]:
+        for tweet_id, url, tweet_text in tweets[:100]:
             tweet_data.append({"text": tweet_text})
             tweet_info.append({"id": tweet_id, "url": url, "text": tweet_text})
         print(f"Сформировано {len(tweet_data)} новых твитов для анализа")
@@ -307,32 +184,14 @@ def get_recent_tweets():
             cursor.execute(update_query, (tweet["id"],))
         print("Обновлены флаги isGrok для новых твитов")
 
-        # Получаем ранее обработанные твиты из tweet_analysis
-        print("Выполняем запрос для ранее обработанных твитов...")
-        analysis_query = """
-                         SELECT title, description
-                         FROM tweet_analysis
-                         WHERE type NOT IN ('alreadyPosted', 'isSpam', 'isFlood')
-                           AND created_at >= NOW() - INTERVAL 10 HOUR \
-                         """
-        cursor.execute(analysis_query)
-        analyzed_tweets = [
-            {"text": f"{row[0]} {row[1]}" if row[0] and row[1] else ""}
-            for row in cursor.fetchall()
-        ]
-        # Фильтруем пустые строки
-        analyzed_tweets = [t for t in analyzed_tweets if t["text"]]
-        print(f"Получено {len(analyzed_tweets)} ранее обработанных твитов")
-
         connection.commit()
         cursor.close()
         connection.close()
         print("get_recent_tweets завершена успешно")
-        return tweet_data, tweet_info, analyzed_tweets
+        return tweet_data, tweet_info
     except mysql.connector.Error as e:
         print(f"Ошибка подключения к базе данных: {str(e)}")
-        return [], [], []
-
+        return [], []
 
 # Функция для сохранения результатов анализа в базу данных
 def save_analysis_results(tweet_info, analysis_results):
@@ -342,7 +201,7 @@ def save_analysis_results(tweet_info, analysis_results):
         cursor = connection.cursor()
         insert_query = """
                        INSERT INTO tweet_analysis (url, type, title, description, created_at)
-                       VALUES (%s, %s, %s, %s, %s) \
+                       VALUES (%s, %s, %s, %s, %s)
                        """
         current_time = datetime.now()
         for tweet, analysis in zip(tweet_info, analysis_results):
@@ -360,25 +219,84 @@ def save_analysis_results(tweet_info, analysis_results):
     except mysql.connector.Error as e:
         print(f"Ошибка сохранения результатов в базу данных: {str(e)}")
 
-
-# Функция для вывода отсортированных результатов по категориям в формате Telegram
-def print_sorted_analysis(tweet_info, analysis_results):
+# Функция для вывода и отправки отсортированных результатов в Telegram
+async def print_sorted_analysis(tweet_info, analysis_results):
     print("\nФорматированный вывод для Telegram:")
+
+    # Словарь эмодзи по типам новостей и контексту
+    emojis = {
+        # Общие категории
+        "Новости": "📢",
+        "Слухи": "❓",
+        "инсайды": "🔍",
+        "технический анализ": "📊",
+        "торговые идеи": "💰",
+        "прогнозы": "🔮",
+        "обучение": "📚",
+        # Контекстные эмодзи
+        "рост": "📈",
+        "падение": "📉",
+        "биткоин": "₿",
+        "btc": "₿",
+        "bitcoin": "₿",
+        "ethereum": "Ξ",
+        "eth": "Ξ",
+        "партнерство": "🤝",
+        "запуск": "🚀",
+        "листинг": "📋",
+        "регулирование": "⚖️",
+        "взлом": "🔓",
+        "безопасность": "🔒",
+        "закон": "📜",
+        "суд": "⚖️",
+        "предупреждение": "⚠️",
+        "опасность": "🚨",
+        "инвестиции": "💵",
+        "доход": "💸",
+        "кошелек": "👛",
+        "новая функция": "✨",
+        "обновление": "🔄",
+        "успех": "✅",
+        "провал": "❌",
+        "внимание": "👀",
+        "важно": "‼️",
+        "инновации": "💡",
+        "платежи": "💳",
+        "nft": "🖼️",
+        "defi": "🏦",
+        "майнинг": "⛏️",
+        "staking": "🥩",
+        "комиссия": "💲",
+        "халвинг": "✂️",
+        "токен": "🪙",
+        "ликвидность": "💧",
+        "волатильность": "🎢"
+    }
 
     # Определяем категории, эмодзи и их соответствие типам
     categories = [
-        ("📰 Новости", ["trueNews"]),
-        ("🗣️ Слухи", ["fakeNews"]),
-        ("🔍 Инсайд", ["inside"]),
-        ("📚 Учеба", ["tutorial"]),
-        ("📊 Аналитика и трейдинг", ["analitics", "trading"]),
-        ("🌐 Другое", ["others"])
+        ("📰 Новости", ["trueNews"], "Новости"),
+        ("🗣️ Слухи", ["fakeNews"], "Слухи"),
+        ("🔍 Инсайд", ["inside"], "Инсайды"),
+        ("📚 Учеба", ["tutorial"], "обучение"),
+        ("📊 Аналитика и трейдинг", ["analitics", "trading"], "Трейдинг"),
+        ("🌐 Другое", ["others"], "Другое")
     ]
+
+    # Зарезервированные символы Markdown V2, которые нужно экранировать
+    markdown_v2_reserved_chars = r'_*[]()~`>#-+=|{.}!'
+
+    # Функция для экранирования зарезервированных символов
+    def escape_markdown_v2(text):
+        for char in markdown_v2_reserved_chars:
+            text = text.replace(char, f'\\{char}')
+        return text
 
     # Формируем сообщение в формате Markdown V2
     output = ["*Криптоанализ твитов* 🌟\n"]
+    messages_to_send = []
 
-    for category_name, category_types in categories:
+    for category_name, category_types, category_emoji_key in categories:
         # Фильтруем твиты, соответствующие текущей категории
         relevant_tweets = [
             (tweet, analysis) for tweet, analysis in zip(tweet_info, analysis_results)
@@ -389,40 +307,88 @@ def print_sorted_analysis(tweet_info, analysis_results):
             output.append(f"*{category_name}*\n")
             for tweet, analysis in relevant_tweets:
                 # Экранируем специальные символы для Markdown V2
-                title = analysis["title"].replace(".", "\\.").replace("-", "\\-").replace("!", "\\!").replace("(",
-                                                                                                              "\\(").replace(
-                    ")", "\\)")
-                description = analysis["description"].replace(".", "\\.").replace("-", "\\-").replace("!",
-                                                                                                      "\\!").replace(
-                    "(", "\\(").replace(")", "\\)")
-                url = tweet["url"].replace(".", "\\.").replace("-", "\\-").replace("!", "\\!").replace("(",
-                                                                                                       "\\(").replace(
-                    ")", "\\)")
-                output.append(f"*{title}*\n{description}\n[Источник]({url})\n")
+                title = escape_markdown_v2(analysis["title"])
+                description = escape_markdown_v2(analysis["description"])
+                url = escape_markdown_v2(tweet["url"])
+
+                # Определяем эмодзи для твита
+                emoji = emojis.get(category_emoji_key, "📢")
+                # Ищем контекстные эмодзи в title и description
+                combined_text = (analysis["title"] + " " + analysis["description"]).lower()
+                for key, value in emojis.items():
+                    if key in combined_text and key not in ["Новости", "Слухи", "инсайды", "технический анализ",
+                                                          "торговые идеи", "прогнозы", "обучение"]:
+                        emoji = value
+                        break
+                # Добавляем твит в вывод
+                output.append(f"*{title} {emoji}*\n{description}\n[Источник]({url})\n")
             output.append("\n")
 
-    # Объединяем строки и выводим
-    formatted_output = "".join(output)
-    print(formatted_output)
+    # Объединяем строки для полного сообщения
+    full_output = "".join(output)
+    print(full_output)
 
+    # Разбиваем сообщение на части, если оно слишком длинное
+    MAX_MESSAGE_LENGTH = 4096
+    current_message = ["*Криптоанализ твитов* 🌟\n"]
+    current_length = len(current_message[0])
+
+    for line in output[1:]:
+        line_length = len(line)
+        # Если добавление строки превысит лимит, отправляем текущую часть
+        if current_length + line_length > MAX_MESSAGE_LENGTH:
+            messages_to_send.append("".join(current_message))
+            current_message = []
+            current_length = 0
+            # Если строка — это заголовок категории, начинаем с него
+            if line.startswith("*") and not line.startswith("*Криптоанализ"):
+                current_message.append(line)
+                current_length = line_length
+            else:
+                # Если это твит, начинаем с предыдущего заголовка категории
+                last_category = next((cat[0] for cat in categories if cat[0] in "".join(output[:output.index(line)])),
+                                     None)
+                if last_category:
+                    current_message.append(f"*{last_category}*\n")
+                    current_length = len(current_message[-1])
+                current_message.append(line)
+                current_length += line_length
+        else:
+            current_message.append(line)
+            current_length += line_length
+
+    # Добавляем последнюю часть, если она не пуста
+    if current_message:
+        messages_to_send.append("".join(current_message))
+
+    # Отправляем каждую часть в Telegram-канал
+    for i, message in enumerate(messages_to_send, 1):
+        try:
+            await bot.send_message(
+                chat_id=telegram_channel_id,
+                text=message,
+                parse_mode="MarkdownV2",
+                disable_web_page_preview=True
+            )
+            print(f"Часть {i} сообщения успешно отправлена в Telegram-канал {telegram_channel_id}")
+        except telegram.error.TelegramError as e:
+            print(f"Ошибка отправки части {i} сообщения в Telegram: {str(e)}")
 
 # Основной цикл
-def main():
+async def main():
     print("Запуск основного цикла...")
     # Получение твитов из базы данных
-    result = get_recent_tweets()
-    print(f"get_recent_tweets вернул: {len(result)} значений")
-    new_tweets, tweet_info, analyzed_tweets = result
+    tweet_data, tweet_info = get_recent_tweets()
+    print(f"get_recent_tweets вернул: {len(tweet_data)} твитов")
 
-    if not new_tweets:
+    if not tweet_data:
         print("Завершение работы: недостаточно новых твитов.")
         return
 
-    print(
-        f"Найдено {len(new_tweets)} новых твитов за последние 4 часа и {len(analyzed_tweets)} ранее обработанных твитов. Начинается анализ...")
+    print(f"Найдено {len(tweet_data)} новых твитов за последние 8 часов. Начинается анализ...")
 
     # Формируем JSON для отправки в Grok
-    tweets_json = json.dumps({"new_tweets": new_tweets, "analyzed_tweets": analyzed_tweets}, ensure_ascii=False)
+    tweets_json = json.dumps(tweet_data, ensure_ascii=False)
     print("JSON для Grok сформирован")
 
     # Инициализация истории сообщений с системным промптом
@@ -443,8 +409,8 @@ def main():
             print("Ошибка: Ответ Grok не является массивом JSON")
             return
 
-        # Выводим отсортированные результаты по категориям
-        print_sorted_analysis(tweet_info, response_json)
+        # Выводим и отправляем отсортированные результаты
+        await print_sorted_analysis(tweet_info, response_json)
 
         # Сохраняем результаты анализа в базу данных
         save_analysis_results(tweet_info, response_json)
@@ -453,6 +419,5 @@ def main():
         print(f"Ошибка: Неверный формат ответа от Grok: {response}")
         return
 
-
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
