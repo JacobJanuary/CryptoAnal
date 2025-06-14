@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 from tabulate import tabulate
 import gspread
 from google.oauth2.service_account import Credentials
+# from gspread.models import CellFormat, Color # Removed this import
+from gspread.utils import ValueInputOption
 
 # Загружаем переменные окружения
 load_dotenv()
@@ -18,6 +20,8 @@ class CryptoPriceAnalyzer:
         self.cmc_base_url = 'https://pro-api.coinmarketcap.com'
         self.google_sheets_enabled = False
         self.setup_google_sheets()
+        self.date_april_7 = "2025-04-07"
+        self.date_may_23 = "2025-05-23"
 
     def setup_google_sheets(self):
         """Настройка подключения к Google Sheets"""
@@ -76,18 +80,16 @@ class CryptoPriceAnalyzer:
             print(f"❌ Ошибка запроса к БД: {err}")
             return []
 
-    def get_historical_prices_batch(self, coin_ids, date_str="2025-04-07"):
-        """Получение исторических цен для пакета валют"""
+    def get_historical_prices_batch(self, coin_ids, date_str):
+        """Получение исторических цен для пакета валют на указанную дату"""
         headers = {
             'X-CMC_PRO_API_KEY': self.cmc_api_key,
             'Accept': 'application/json'
         }
 
-        # Конвертируем дату в timestamp
         date_obj = datetime.strptime(date_str, "%Y-%m-%d")
         timestamp = int(date_obj.timestamp())
 
-        # CMC API принимает до 100 ID за раз
         batch_size = 100
         all_prices = {}
 
@@ -104,20 +106,42 @@ class CryptoPriceAnalyzer:
                 'interval': 'daily'
             }
 
+            print(f"   Fetching historical prices for {date_str}, batch {i // batch_size + 1}...")
             try:
                 response = requests.get(url, headers=headers, params=params)
-                if response.status_code == 200:
-                    data = response.json()
-                    if 'data' in data:
-                        for coin_id_str, coin_data in data['data'].items():
-                            coin_id = int(coin_id_str)
-                            if 'quotes' in coin_data and coin_data['quotes']:
-                                price = coin_data['quotes'][0]['quote']['USD']['price']
-                                all_prices[coin_id] = price
+                response.raise_for_status()
+                data = response.json()
+
+                if 'data' in data and data['data']:  # Check if data['data'] is not None or empty
+                    for coin_id_str, coin_data_entry in data['data'].items():
+                        coin_id = int(coin_id_str)
+                        actual_coin_data = coin_data_entry[0] if isinstance(coin_data_entry,
+                                                                            list) and coin_data_entry else coin_data_entry
+
+                        if actual_coin_data and 'quotes' in actual_coin_data and actual_coin_data['quotes']:
+                            quote_list = actual_coin_data['quotes']
+                            if isinstance(quote_list, list) and quote_list:
+                                price_info = quote_list[0].get('quote', {}).get('USD', {})
+                                price = price_info.get('price')
+                                if price is not None:
+                                    all_prices[coin_id] = price
+                                else:
+                                    print(
+                                        f"     ⚠️  Price is None for coin ID {coin_id} on {date_str}. Quote: {price_info}")
+                            else:
+                                print(
+                                    f"     ⚠️  'quotes' list is empty or not a list for coin ID {coin_id} on {date_str}. Quotes: {quote_list}")
+                        else:
+                            print(
+                                f"     ⚠️  No 'quotes' in data for coin ID {coin_id} on {date_str}. Data: {str(actual_coin_data)[:200]}")
                 else:
-                    print(f"❌ Ошибка API (исторические): {response.status_code}")
+                    print(
+                        f"   ❌ No 'data' field or empty 'data' in API response for historical prices ({date_str}). Status: {data.get('status')}")
+
+            except requests.exceptions.HTTPError as http_err:
+                print(f"   ❌ HTTP ошибка API (исторические {date_str}): {http_err} - {response.text}")
             except Exception as e:
-                print(f"❌ Ошибка получения исторических цен: {e}")
+                print(f"   ❌ Ошибка получения исторических цен для {date_str}: {e}")
 
         return all_prices
 
@@ -128,7 +152,6 @@ class CryptoPriceAnalyzer:
             'Accept': 'application/json'
         }
 
-        # CMC API принимает до 5000 ID за раз для текущих цен
         batch_size = 1000
         all_prices = {}
 
@@ -138,26 +161,38 @@ class CryptoPriceAnalyzer:
 
             url = f"{self.cmc_base_url}/v1/cryptocurrency/quotes/latest"
             params = {'id': ids_str}
-
+            print(f"   Fetching current prices, batch {i // batch_size + 1}...")
             try:
                 response = requests.get(url, headers=headers, params=params)
-                if response.status_code == 200:
-                    data = response.json()
-                    if 'data' in data:
-                        for coin_id_str, coin_data in data['data'].items():
-                            coin_id = int(coin_id_str)
-                            price = coin_data['quote']['USD']['price']
-                            all_prices[coin_id] = price
+                response.raise_for_status()
+                data = response.json()
+                if 'data' in data and data['data']:
+                    for coin_id_str, coin_data_entry in data['data'].items():
+                        coin_id = int(coin_id_str)
+                        # CMC API for latest quotes has a slightly different structure for 'data' items
+                        if coin_data_entry and 'quote' in coin_data_entry and 'USD' in coin_data_entry['quote']:
+                            price = coin_data_entry['quote']['USD'].get('price')
+                            if price is not None:
+                                all_prices[coin_id] = price
+                            else:
+                                print(
+                                    f"     ⚠️  Price is None for coin ID {coin_id} (current). Quote: {coin_data_entry['quote']['USD']}")
+                        else:
+                            print(
+                                f"     ⚠️  Unexpected data structure for coin ID {coin_id} (current). Data: {str(coin_data_entry)[:200]}")
                 else:
-                    print(f"❌ Ошибка API (текущие): {response.status_code}")
+                    print(
+                        f"   ❌ No 'data' field or empty 'data' in API response for current prices. Status: {data.get('status')}")
+            except requests.exceptions.HTTPError as http_err:
+                print(f"   ❌ HTTP ошибка API (текущие): {http_err} - {response.text}")
             except Exception as e:
-                print(f"❌ Ошибка получения текущих цен: {e}")
+                print(f"   ❌ Ошибка получения текущих цен: {e}")
 
         return all_prices
 
     def calculate_price_change(self, old_price, new_price):
         """Вычисление процентного изменения цены"""
-        if old_price and new_price and old_price > 0:
+        if old_price is not None and new_price is not None and old_price > 0:
             return ((new_price - old_price) / old_price) * 100
         return None
 
@@ -175,56 +210,75 @@ class CryptoPriceAnalyzer:
             print("❌ Не найдено избранных валют")
             return
 
-        # Извлекаем ID для пакетных запросов
         coin_ids = [coin[0] for coin in coins]
         coin_dict = {coin[0]: {'name': coin[1], 'symbol': coin[2]} for coin in coins}
 
-        print(f"\n🔄 Получение исторических цен для {len(coin_ids)} валют...")
-        historical_prices = self.get_historical_prices_batch(coin_ids)
+        print(f"\n🔄 Получение исторических цен ({self.date_april_7}) для {len(coin_ids)} валют...")
+        prices_april_7 = self.get_historical_prices_batch(coin_ids, self.date_april_7)
 
-        print(f"🔄 Получение текущих цен для {len(coin_ids)} валют...")
+        print(f"\n🔄 Получение исторических цен ({self.date_may_23}) для {len(coin_ids)} валют...")
+        prices_may_23 = self.get_historical_prices_batch(coin_ids, self.date_may_23)
+
+        print(f"\n🔄 Получение текущих цен для {len(coin_ids)} валют...")
         current_prices = self.get_current_prices_batch(coin_ids)
 
         results = []
-
         print("\n📊 Обработка данных...")
         for coin_id in coin_ids:
             coin_info = coin_dict[coin_id]
-            historical_price = historical_prices.get(coin_id)
+            price_d1 = prices_april_7.get(coin_id)
+            price_d2 = prices_may_23.get(coin_id)
             current_price = current_prices.get(coin_id)
 
-            if historical_price and current_price:
-                price_change = self.calculate_price_change(historical_price, current_price)
+            change_d1_to_d2 = self.calculate_price_change(price_d1, price_d2)
+            change_d2_to_current = self.calculate_price_change(price_d2, current_price)
 
+            if price_d1 is not None or price_d2 is not None or current_price is not None:
                 results.append({
                     'name': coin_info['name'],
                     'symbol': coin_info['symbol'],
-                    'price_april_7': historical_price,
+                    'price_april_7': price_d1,
+                    'price_may_23': price_d2,
                     'current_price': current_price,
-                    'change_percent': price_change
+                    'change_d1_d2_percent': change_d1_to_d2,
+                    'change_d2_current_percent': change_d2_to_current
                 })
             else:
-                print(f"   ⚠️  Нет данных для {coin_info['symbol']} (ID: {coin_id})")
+                print(f"   ⚠️  Нет данных для {coin_info['symbol']} (ID: {coin_id}) по всем запрашиваемым датам.")
 
-        # Сортируем по изменению цены (по убыванию)
-        results.sort(key=lambda x: x['change_percent'] if x['change_percent'] else float('-inf'), reverse=True)
+        results.sort(
+            key=lambda x: x['change_d1_d2_percent'] if x['change_d1_d2_percent'] is not None else float('-inf'),
+            reverse=True)
 
-        # Выводим таблицу
         self.display_results(results)
 
-        # Статистика API запросов
-        historical_batches = (len(coin_ids) + 99) // 100  # округляем вверх
-        current_batches = (len(coin_ids) + 999) // 1000  # округляем вверх
-        total_requests = historical_batches + current_batches
+        historical_batches_d1 = (len(coin_ids) + 99) // 100
+        historical_batches_d2 = (len(coin_ids) + 99) // 100
+        current_batches = (len(coin_ids) + 999) // 1000
+        total_requests = historical_batches_d1 + historical_batches_d2 + current_batches
+        requests_without_batching = len(coin_ids) * 3
 
         print(f"\n💡 Экономия API токенов:")
-        print(f"   Без пакетной обработки: {len(coin_ids) * 2} запросов")
+        print(f"   Без пакетной обработки: {requests_without_batching} запросов")
         print(f"   С пакетной обработкой: {total_requests} запросов")
-        print(f"   Экономия: {len(coin_ids) * 2 - total_requests} запросов")
+        print(f"   Экономия: {requests_without_batching - total_requests} запросов")
 
-        # Закрываем соединение с БД
         if self.db_connection:
             self.db_connection.close()
+
+    def format_percentage_change(self, change_percent, for_sheets=False):
+        """Форматирует строку изменения процента с эмодзи"""
+        if change_percent is None:
+            return "N/A"
+
+        change_str = f"{change_percent:.2f}%"
+        # For sheets, emojis are fine. For console, some terminals might handle them better.
+        if change_percent > 0:
+            return f"🟢 +{change_str}"
+        elif change_percent < 0:
+            return f"🔴 {change_str}"
+        else:
+            return f"⚪️ {change_str}"
 
     def display_results(self, results):
         """Вывод результатов в виде таблицы"""
@@ -232,35 +286,34 @@ class CryptoPriceAnalyzer:
             print("❌ Нет данных для отображения")
             return
 
-        print("\n" + "=" * 80)
+        print("\n" + "=" * 120)
         print("📊 АНАЛИЗ ИЗМЕНЕНИЯ ЦЕН КРИПТОВАЛЮТ")
-        print("=" * 80)
+        print("=" * 120)
 
         table_data = []
         for result in results:
-            change_str = f"{result['change_percent']:.2f}%" if result['change_percent'] else "N/A"
-
-            # Добавляем эмодзи для наглядности
-            if result['change_percent']:
-                if result['change_percent'] > 0:
-                    change_str = f"🟢 +{change_str}"
-                else:
-                    change_str = f"🔴 {change_str}"
-
             table_data.append([
                 result['name'],
                 result['symbol'],
-                f"${result['price_april_7']:.4f}" if result['price_april_7'] else "N/A",
-                f"${result['current_price']:.4f}" if result['current_price'] else "N/A",
-                change_str
+                f"${result['current_price']:.4f}" if result['current_price'] is not None else "N/A",
+                f"${result['price_may_23']:.4f}" if result['price_may_23'] is not None else "N/A",
+                f"${result['price_april_7']:.4f}" if result['price_april_7'] is not None else "N/A",
+                self.format_percentage_change(result['change_d1_d2_percent']),
+                self.format_percentage_change(result['change_d2_current_percent'])
             ])
 
-        headers = ['Проект', 'Символ', 'Цена 07.04.2025', 'Текущая цена', 'Изменение %']
+        date_d1_short_display = f'{self.date_april_7.split("-")[2]}.{self.date_april_7.split("-")[1]}'
+        date_d2_short_display = f'{self.date_may_23.split("-")[2]}.{self.date_may_23.split("-")[1]}'
+
+        headers = ['Проект', 'Символ', 'Текущая цена',
+                   f'Цена {date_d2_short_display}',
+                   f'Цена {date_d1_short_display}',
+                   f'Рост {date_d1_short_display}-{date_d2_short_display} %',
+                   f'Рост {date_d2_short_display}-Тек. %']
 
         print(tabulate(table_data, headers=headers, tablefmt='grid'))
         print(f"\n📈 Всего проанализировано: {len(results)} валют")
 
-        # Экспорт в Google Sheets
         if self.google_sheets_enabled:
             self.export_to_google_sheets(results)
 
@@ -268,62 +321,63 @@ class CryptoPriceAnalyzer:
         """Экспорт данных в Google Таблицу"""
         try:
             spreadsheet_name = os.getenv('GOOGLE_SPREADSHEET_NAME', 'Crypto Price Analysis')
-
-            # Пытаемся открыть существующую таблицу или создать новую
             try:
                 spreadsheet = self.gc.open(spreadsheet_name)
                 print(f"📋 Открыта существующая таблица: {spreadsheet_name}")
             except gspread.SpreadsheetNotFound:
                 spreadsheet = self.gc.create(spreadsheet_name)
                 print(f"📋 Создана новая таблица: {spreadsheet_name}")
+                editor_email = os.getenv('GOOGLE_SHEET_EDITOR_EMAIL')
+                if editor_email:
+                    try:
+                        spreadsheet.share(editor_email, perm_type='user', role='writer')
+                        print(f"✓ Таблица расшарена для {editor_email}")
+                    except Exception as share_err:
+                        print(f"⚠️ Ошибка расшаривания таблицы: {share_err}")
 
-                # Делаем таблицу доступной для редактирования (опционально)
-                spreadsheet.share('', perm_type='anyone', role='writer')
-
-            # Получаем первый лист или создаем новый
             try:
                 worksheet = spreadsheet.sheet1
             except:
-                worksheet = spreadsheet.add_worksheet(title="Analysis", rows="1000", cols="20")
+                worksheet = spreadsheet.add_worksheet(title="Analysis", rows="1000", cols="30")
 
-            # Очищаем лист
             worksheet.clear()
 
-            # Подготавливаем данные для записи
-            headers = ['Проект', 'Символ', 'Цена 07.04.2025', 'Текущая цена', 'Изменение %', 'Изменение $']
+            timestamp_str = datetime.now().strftime("%d.%m.%Y %H:%M")
+            date_d1_short = f'{self.date_april_7.split("-")[2]}.{self.date_april_7.split("-")[1]}'
+            date_d2_short = f'{self.date_may_23.split("-")[2]}.{self.date_may_23.split("-")[1]}'
 
-            # Добавляем заголовок с датой и временем
-            timestamp = datetime.now().strftime("%d.%m.%Y %H:%M")
-            worksheet.update('A1:F1', [[f'Анализ криптовалют - {timestamp}', '', '', '', '', '']])
+            gs_headers = ['Проект', 'Символ', 'Текущая цена',
+                          f'Цена {date_d2_short}',
+                          f'Цена {date_d1_short}',
+                          f'Рост {date_d1_short}-{date_d2_short} %',
+                          f'Рост {date_d2_short}-Тек. %']
 
-            # Добавляем заголовки таблицы
-            worksheet.update('A3:F3', [headers])
+            num_cols = len(gs_headers)
+            title_header_sheet = [f'Анализ криптовалют - {timestamp_str}'] + [''] * (num_cols - 1)
+            worksheet.update('A1', [title_header_sheet], value_input_option=ValueInputOption.user_entered)
+            worksheet.update('A3', [gs_headers], value_input_option=ValueInputOption.user_entered)
 
-            # Подготавливаем данные
             rows_data = []
             for result in results:
-                change_percent = f"{result['change_percent']:.2f}%" if result['change_percent'] else "N/A"
-                change_dollar = ""
-
-                if result['price_april_7'] and result['current_price']:
-                    change_dollar = f"${result['current_price'] - result['price_april_7']:.4f}"
+                current_price_gs = result['current_price'] if result['current_price'] is not None else "N/A"
+                price_may_23_gs = result['price_may_23'] if result['price_may_23'] is not None else "N/A"
+                price_april_7_gs = result['price_april_7'] if result['price_april_7'] is not None else "N/A"
 
                 rows_data.append([
                     result['name'],
                     result['symbol'],
-                    f"${result['price_april_7']:.4f}" if result['price_april_7'] else "N/A",
-                    f"${result['current_price']:.4f}" if result['current_price'] else "N/A",
-                    change_percent,
-                    change_dollar
+                    current_price_gs,
+                    price_may_23_gs,
+                    price_april_7_gs,
+                    self.format_percentage_change(result['change_d1_d2_percent'], for_sheets=True),
+                    self.format_percentage_change(result['change_d2_current_percent'], for_sheets=True)
                 ])
 
-            # Записываем данные
             if rows_data:
-                range_name = f'A4:F{3 + len(rows_data)}'
-                worksheet.update(range_name, rows_data)
+                worksheet.update(f'A4:{chr(64 + num_cols)}{3 + len(rows_data)}', rows_data,
+                                 value_input_option=ValueInputOption.user_entered)
 
-            # Форматирование таблицы
-            self.format_google_sheet(worksheet, len(rows_data))
+            self.format_google_sheet(worksheet, len(rows_data), num_cols)
 
             spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet.id}"
             print(f"✅ Данные экспортированы в Google Таблицу: {spreadsheet_url}")
@@ -331,51 +385,75 @@ class CryptoPriceAnalyzer:
         except Exception as e:
             print(f"❌ Ошибка экспорта в Google Sheets: {e}")
 
-    def format_google_sheet(self, worksheet, data_rows):
-        """Форматирование Google таблицы"""
+    def format_google_sheet(self, worksheet, data_rows, num_cols):
+        """Форматирование Google таблицы с улучшенной визуализацией"""
         try:
-            # Заголовок
-            worksheet.format('A1:F1', {
-                'backgroundColor': {'red': 0.2, 'green': 0.6, 'blue': 0.9},
-                'textFormat': {'bold': True, 'fontSize': 14},
-                'horizontalAlignment': 'CENTER'
+            # Общий заголовок листа
+            worksheet.merge_cells(f'A1:{chr(64 + num_cols)}1', merge_type='MERGE_ALL')
+            worksheet.format('A1', {
+                "backgroundColor": {"red": 0.2, "green": 0.6, "blue": 0.9},
+                "textFormat": {"foregroundColor": {"red": 1.0, "green": 1.0, "blue": 1.0},
+                               "bold": True, "fontSize": 14},
+                "horizontalAlignment": "CENTER",
+                "verticalAlignment": "MIDDLE"
             })
 
-            # Заголовки колонок
-            worksheet.format('A3:F3', {
-                'backgroundColor': {'red': 0.8, 'green': 0.8, 'blue': 0.8},
-                'textFormat': {'bold': True},
-                'horizontalAlignment': 'CENTER',
-                'borders': {
-                    'top': {'style': 'SOLID'},
-                    'bottom': {'style': 'SOLID'},
-                    'left': {'style': 'SOLID'},
-                    'right': {'style': 'SOLID'}
+            # Заголовки колонок таблицы
+            header_range_gs = f'A3:{chr(64 + num_cols)}3'
+            worksheet.format(header_range_gs, {
+                "backgroundColor": {"red": 0.85, "green": 0.85, "blue": 0.85},
+                "textFormat": {"bold": True, "fontSize": 10},
+                "horizontalAlignment": "CENTER",
+                "verticalAlignment": "MIDDLE",
+                "wrapStrategy": "WRAP",
+                "borders": {
+                    "top": {"style": "SOLID_MEDIUM"}, "bottom": {"style": "SOLID_MEDIUM"},
+                    "left": {"style": "SOLID_THIN"}, "right": {"style": "SOLID_THIN"}
                 }
             })
 
-            # Данные
             if data_rows > 0:
-                data_range = f'A4:F{3 + data_rows}'
-                worksheet.format(data_range, {
-                    'borders': {
-                        'top': {'style': 'SOLID'},
-                        'bottom': {'style': 'SOLID'},
-                        'left': {'style': 'SOLID'},
-                        'right': {'style': 'SOLID'}
+                data_range_str_gs = f'A4:{chr(64 + num_cols)}{3 + data_rows}'
+                worksheet.format(data_range_str_gs, {
+                    "borders": {
+                        "top": {"style": "SOLID_THIN"}, "bottom": {"style": "SOLID_THIN"},
+                        "left": {"style": "SOLID_THIN"}, "right": {"style": "SOLID_THIN"}
                     }
                 })
 
-                # Выравнивание колонок с ценами по правому краю
-                worksheet.format(f'C4:F{3 + data_rows}', {
+                # Формат для цен (колонки C, D, E - индексы 2, 3, 4)
+                # Используем словарь напрямую для cell_format
+                price_format_dict = {
+                    'numberFormat': {'type': 'NUMBER', 'pattern': '$#,##0.0000'},
                     'horizontalAlignment': 'RIGHT'
-                })
+                }
+                worksheet.format(f'C4:E{3 + data_rows}', price_format_dict)
 
-            # Автоподбор ширины колонок
-            worksheet.columns_auto_resize(0, 5)
+                percent_text_format_dict = {
+                    'horizontalAlignment': 'RIGHT',
+                }
+                worksheet.format(f'F4:G{3 + data_rows}', percent_text_format_dict)
+
+                light_grey_bg = {"red": 0.95, "green": 0.95, "blue": 0.95}  # Светло-серый
+                requests_for_formatting = []
+                for i in range(data_rows):
+                    current_row_in_sheet = 4 + i
+                    if i % 2 == 1:
+                        requests_for_formatting.append({
+                            'range': f'A{current_row_in_sheet}:{chr(64 + num_cols)}{current_row_in_sheet}',
+                            'format': {'backgroundColor': light_grey_bg}
+                        })
+                if requests_for_formatting:
+                    worksheet.batch_format(requests_for_formatting)
+
+            if hasattr(worksheet, 'columns_auto_resize'):
+                for col_idx in range(num_cols):
+                    worksheet.columns_auto_resize(col_idx, col_idx)
+            else:
+                print("⚠️  Автоподбор ширины колонок может потребовать gspread v6+ или ручной настройки.")
 
         except Exception as e:
-            print(f"⚠️  Ошибка форматирования: {e}")
+            print(f"⚠️  Ошибка форматирования Google Sheets: {e}")
 
 
 def main():
