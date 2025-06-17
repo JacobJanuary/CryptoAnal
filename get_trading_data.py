@@ -11,21 +11,44 @@ from datetime import datetime, timezone, timedelta
 import logging
 from typing import Dict, List, Optional, Tuple, Any, Callable
 import random
+import colorlog  # <-- НОВЫЙ ИМПОРТ
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
-    datefmt='%H:%M:%S'
-)
-logger = logging.getLogger(__name__)
+
+# --- ИЗМЕНЕНИЕ: Настройка цветного логирования ---
+def setup_colored_logging() -> logging.Logger:
+    """Настраивает цветной вывод логов в консоль."""
+    handler = colorlog.StreamHandler()
+    formatter = colorlog.ColoredFormatter(
+        '%(log_color)s%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        datefmt='%H:%M:%S',
+        log_colors={
+            'DEBUG': 'cyan',
+            'INFO': 'white',
+            'WARNING': 'yellow',
+            'ERROR': 'red',
+            'CRITICAL': 'bold_red',
+        }
+    )
+    handler.setFormatter(formatter)
+    logger = logging.getLogger(__name__)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False  # Чтобы избежать дублирования логов
+    return logger
+
+
+logger = setup_colored_logging()
+# ----------------------------------------------------
+
 
 # --- 1. Настройки и глобальные переменные ---
 load_dotenv()
 MARKET_STATE: Dict[str, Dict] = {}
 SPOT_STATE: Dict[str, Dict] = {}
-# Глобальный словарь для хранения "последнего известного состояния" для фьючерсов
 LAST_KNOWN_FUTURES_STATE: Dict[int, Dict] = {}
+# --- НОВОЕ: Словарь для истории минутных свечей Bybit ---
+BYBIT_KLINE_HISTORY: Dict[str, List[float]] = {}
+# ------------------------------------------------------
 
 QUOTE_ASSETS = ['USDT', 'USDC', 'USD', 'FDUSD', 'TUSD', 'BTC', 'ETH']
 USER_AGENTS = [
@@ -45,8 +68,7 @@ def parse_symbol(symbol_str: str) -> Tuple[str, str]:
             base = symbol_str[:-len(quote)]
             return base, quote
     parts = symbol_str.split('-')
-    if len(parts) == 2:
-        return parts[0], parts[1]
+    if len(parts) == 2: return parts[0], parts[1]
     return symbol_str, "N/A"
 
 
@@ -66,14 +88,13 @@ async def spot_binance_worker(pairs_to_track: List[str]) -> None:
     async def handle_spot_chunk(pairs_chunk: List[str]) -> None:
         streams = [f"{p.lower()}@ticker" for p in pairs_chunk] + [f"{p.lower()}@ticker_1h" for p in pairs_chunk]
         url = f"wss://stream.binance.com:9443/stream?streams={'/'.join(streams)}"
-
         while True:
             try:
                 async with websockets.connect(url, ssl=ssl_context) as websocket:
                     logger.info(f"[Spot Binance Chunk] Подключен к {len(pairs_chunk)} парам.")
                     while True:
-                        wrapper = orjson.loads(await websocket.recv())
-                        stream_name = wrapper.get('stream')
+                        wrapper = orjson.loads(await websocket.recv());
+                        stream_name = wrapper.get('stream');
                         data = wrapper.get('data')
                         if not data: continue
                         symbol = data.get('s')
@@ -87,7 +108,7 @@ async def spot_binance_worker(pairs_to_track: List[str]) -> None:
                                 {'price': float(data.get('c', 0)), 'volume_24h': float(data.get('v', 0)),
                                  'quote_volume_24h': float(data.get('q', 0))})
             except Exception as e:
-                logger.error(f"[Spot Binance Chunk] Ошибка: {e}. Переподключение через 10 сек...")
+                logger.error(f"[Spot Binance Chunk] Ошибка: {e}. Переподключение через 10 сек...");
                 await asyncio.sleep(10)
 
     chunk_size = 100
@@ -95,12 +116,13 @@ async def spot_binance_worker(pairs_to_track: List[str]) -> None:
     await asyncio.gather(*tasks)
 
 
+# --- ИЗМЕНЕНИЕ: Полностью переработанный spot_bybit_worker ---
 async def spot_bybit_worker(pairs_to_track: List[str]) -> None:
-    logger.info(f"[Spot Bybit] Запуск WebSocket воркера для {len(pairs_to_track)} пар.")
-    topics = [f"tickers.{pair}" for pair in pairs_to_track]
+    """Подключается к потокам tickers и kline для спота Bybit и рассчитывает часовой объем на лету."""
+    logger.info(f"[Spot Bybit] Запуск WebSocket воркера для {len(pairs_to_track)} пар (с расчетом 1ч объема).")
+    topics = [f"tickers.{pair}" for pair in pairs_to_track] + [f"kline.1.{pair}" for pair in pairs_to_track]
     url = "wss://stream.bybit.com/v5/public/spot"
     ssl_context = ssl.create_default_context(cafile=certifi.where())
-
     while True:
         try:
             async with websockets.connect(url, ssl=ssl_context) as websocket:
@@ -111,10 +133,10 @@ async def spot_bybit_worker(pairs_to_track: List[str]) -> None:
                 logger.info(f"[Spot Bybit] Отправлены запросы на подписку для {len(topics)} тем.")
                 while True:
                     data = orjson.loads(await websocket.recv())
-                    if data.get('op') == 'ping':
-                        await websocket.send(orjson.dumps({"op": "pong"}))
-                    elif 'topic' in data and data['topic'].startswith('tickers'):
-                        ticker_data = data['data']
+                    if data.get('op') == 'ping': await websocket.send(orjson.dumps({"op": "pong"})); continue
+                    topic = data.get('topic', '')
+                    if topic.startswith('tickers.'):
+                        ticker_data = data['data'];
                         symbol = ticker_data.get('symbol')
                         if not symbol: continue
                         market_key = f"BYBIT:{symbol}"
@@ -123,8 +145,22 @@ async def spot_bybit_worker(pairs_to_track: List[str]) -> None:
                                                                           ticker_data.get('volume24h', 0)),
                                                                       'quote_volume_24h': float(
                                                                           ticker_data.get('turnover24h', 0))})
+                    elif topic.startswith('kline.'):
+                        kline_list = data.get('data', [])
+                        if not kline_list: continue
+                        kline_data = kline_list[0];
+                        symbol = topic.split('.')[-1]
+                        market_key = f"BYBIT:{symbol}"
+                        volume_history = BYBIT_KLINE_HISTORY.setdefault(symbol, [])
+                        volume_history.append(float(kline_data.get('volume', 0)))
+                        BYBIT_KLINE_HISTORY[symbol] = volume_history[-60:]
+                        volume_1h = sum(BYBIT_KLINE_HISTORY[symbol])
+                        price = SPOT_STATE.get(market_key, {}).get('price', 0)
+                        quote_volume_1h = volume_1h * price if price > 0 else 0
+                        SPOT_STATE.setdefault(market_key, {}).update(
+                            {'volume_1h': volume_1h, 'quote_volume_1h': quote_volume_1h})
         except Exception as e:
-            logger.error(f"[Spot Bybit] Ошибка: {e}. Переподключение через 10 сек...")
+            logger.error(f"[Spot Bybit] Ошибка: {e}. Переподключение через 10 сек...");
             await asyncio.sleep(10)
 
 
@@ -195,13 +231,14 @@ async def bybit_worker(pairs_to_track: List[str]) -> None:
 
 
 async def parse_binance_oi(session: aiohttp.ClientSession, symbol: str) -> Tuple[str, bool, None]:
-    url = f"https://fapi.binance.com/fapi/v1/openInterest?symbol={symbol}"
+    url = f"https://fapi.binance.com/fapi/v1/openInterest?symbol={symbol}";
+    headers = {'User-Agent': get_random_user_agent()}
     try:
-        async with session.get(url, timeout=10) as response:
+        async with session.get(url, timeout=10, headers=headers) as response:
             if response.status == 200:
-                data = await response.json(loads=orjson.loads)
+                data = await response.json(loads=orjson.loads);
                 oi_value = float(data.get('openInterest', 0))
-                MARKET_STATE.setdefault(f"BINANCE:{symbol}", {})['open_interest'] = oi_value
+                MARKET_STATE.setdefault(f"BINANCE:{symbol}", {})['open_interest'] = oi_value;
                 return symbol, True, None
             else:
                 logger.warning(f"[OI - Binance] HTTP {response.status} для {symbol}");
@@ -212,9 +249,10 @@ async def parse_binance_oi(session: aiohttp.ClientSession, symbol: str) -> Tuple
 
 
 async def parse_bybit_oi(session: aiohttp.ClientSession, symbol: str) -> Tuple[str, bool, None]:
+    headers = {'User-Agent': get_random_user_agent()}
     try:
         url = f"https://api.bybit.com/v5/market/open-interest?category=linear&symbol={symbol}"
-        async with session.get(url, timeout=10) as response:
+        async with session.get(url, timeout=10, headers=headers) as response:
             if response.status == 200:
                 data = await response.json(loads=orjson.loads)
                 if data.get('retCode') == 0 and data.get('result', {}).get('list'):
@@ -226,7 +264,7 @@ async def parse_bybit_oi(session: aiohttp.ClientSession, symbol: str) -> Tuple[s
                             return symbol, True, None
         logger.debug(f"[OI - Bybit] Для {symbol} нет данных на /open-interest, пробую /tickers.")
         tickers_url = f"https://api.bybit.com/v5/market/tickers?category=linear&symbol={symbol}"
-        async with session.get(tickers_url, timeout=10) as response:
+        async with session.get(tickers_url, timeout=10, headers=headers) as response:
             if response.status == 200:
                 data = await response.json(loads=orjson.loads)
                 if data.get('retCode') == 0 and data.get('result', {}).get('list'):
@@ -265,8 +303,8 @@ async def oi_collector(exchange_name: str, pairs: List[str], oi_parser: Callable
 # --- 4. Сохранение данных в БД ---
 async def spot_db_saver(db_pool: asyncpg.Pool, spot_pairs_from_db: Dict[int, Dict]) -> None:
     logger.info("[Spot DB Saver] Запущен.")
-    required_keys_binance = ['price', 'volume_1h', 'quote_volume_1h', 'volume_24h', 'quote_volume_24h']
-    required_keys_bybit = ['price', 'volume_24h', 'quote_volume_24h']
+    # --- ИЗМЕНЕНИЕ: Требования для Bybit теперь такие же, как для Binance ---
+    required_keys = ['price', 'volume_1h', 'quote_volume_1h', 'volume_24h', 'quote_volume_24h']
     exchange_map = {1: "BINANCE", 2: "BYBIT"}
 
     while True:
@@ -285,7 +323,6 @@ async def spot_db_saver(db_pool: asyncpg.Pool, spot_pairs_from_db: Dict[int, Dic
                 exchange_name = exchange_map.get(pair_info['exchange_id'])
                 market_key = f"{exchange_name}:{pair_info['pair_symbol']}"
                 state = SPOT_STATE.get(market_key)
-                required_keys = required_keys_binance if exchange_name == "BINANCE" else required_keys_bybit
                 if state and all(key in state for key in required_keys):
                     records_to_save_this_minute[pair_id] = state.copy();
                     pairs_needing_data.remove(pair_id)
@@ -297,11 +334,9 @@ async def spot_db_saver(db_pool: asyncpg.Pool, spot_pairs_from_db: Dict[int, Dic
             pair_info = spot_pairs_from_db[pair_id];
             pair_symbol = pair_info['pair_symbol'];
             base_asset, quote_asset = parse_symbol(pair_symbol)
-            volume_1h = state.get('volume_1h', 0.0);
-            quote_volume_1h = state.get('quote_volume_1h', 0.0)
             records_for_executemany.append(
-                (pair_id, capture_time, pair_symbol, base_asset, quote_asset, state['price'], volume_1h,
-                 quote_volume_1h, state['volume_24h'], state['quote_volume_24h']))
+                (pair_id, capture_time, pair_symbol, base_asset, quote_asset, state['price'], state['volume_1h'],
+                 state['quote_volume_1h'], state['volume_24h'], state['quote_volume_24h']))
         try:
             async with db_pool.acquire() as conn:
                 await conn.executemany("""
@@ -366,11 +401,9 @@ async def main():
     """Главная функция-оркестратор."""
     db_pool = None
     try:
-        db_pool = await asyncpg.create_pool(
-            user=os.getenv("POSTGRES_USER"), password=os.getenv("POSTGRES_PASSWORD"),
-            host=os.getenv("POSTGRES_HOST"), port=os.getenv("POSTGRES_PORT"),
-            database=os.getenv("POSTGRES_DB")
-        )
+        db_pool = await asyncpg.create_pool(user=os.getenv("POSTGRES_USER"), password=os.getenv("POSTGRES_PASSWORD"),
+                                            host=os.getenv("POSTGRES_HOST"), port=os.getenv("POSTGRES_PORT"),
+                                            database=os.getenv("POSTGRES_DB"))
         logger.info("Успешное подключение к PostgreSQL.")
         async with db_pool.acquire() as conn:
             sql_query = "SELECT id, pair_symbol, exchange_id, contract_type_id FROM trading_pairs"
