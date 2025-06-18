@@ -21,7 +21,7 @@ EXCHANGES = {'binance': 1, 'bybit': 2}
 # ОБНОВЛЕНО: Добавлен тип контракта 'SPOT'
 CONTRACT_TYPES = {'PERPETUAL': 1, 'SPOT': 2}
 # Белый список квотируемых активов для фильтрации
-ALLOWED_QUOTE_ASSETS = {'USDT', 'USDC', 'BUSD'}  # BUSD для совместимости со старыми парами Binance
+ALLOWED_QUOTE_ASSETS = {'USDT', 'USDC', 'BUSD', 'BTC'}  # BUSD для совместимости со старыми парами Binance
 
 
 def get_db_connection():
